@@ -1,0 +1,65 @@
+name: Build and Release SpeedCam APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: v1.${{ github.run_number }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Build APK (signed release if keystore secrets exist, otherwise debug)
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/speedcam.jks"
+            export KEYSTORE_PATH="$RUNNER_TEMP/speedcam.jks"
+            gradle assembleRelease --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk SpeedCam.apk
+          else
+            echo "No keystore secrets: building a debug APK"
+            gradle assembleDebug --stacktrace
+            cp app/build/outputs/apk/debug/app-debug.apk SpeedCam.apk
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: SpeedCam ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          files: SpeedCam.apk
+
+      - name: Delete old releases (keep latest 1)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --repo ${{ github.repository }} --limit 100 --json tagName --jq '.[].tagName' | tail -n +2 | while read t; do
+            gh release delete "$t" --repo ${{ github.repository }} --cleanup-tag --yes
+          done
