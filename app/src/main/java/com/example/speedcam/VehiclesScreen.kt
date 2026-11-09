@@ -67,6 +67,7 @@ fun VehiclesScreen(vm: MainViewModel) {
     val s by vm.settings.collectAsStateWithLifecycle()
     var onlyOver by rememberSaveable { mutableStateOf(false) }
     var reliableOnly by rememberSaveable { mutableStateOf(false) }
+    var weakFirst by rememberSaveable { mutableStateOf(false) }   // ترتيب الأضعف ثقة أولاً عشان نراجع المشكوك فيه
     var evidencePath by remember { mutableStateOf<String?>(null) }
     var confirm by remember { mutableStateOf(0) }                    // 1 = حذف المعروض ، 2 = حذف الكل
     var delOne by remember { mutableStateOf<SpeedRecord?>(null) }    // حذف مركبة واحدة
@@ -84,7 +85,12 @@ fun VehiclesScreen(vm: MainViewModel) {
     val over = remember(measured, limit) { measured.filter { statusOf(it, limit) > 0 } }
     val confirmed = remember(measured, limit) { measured.filter { statusOf(it, limit) == 2 } }
     val uncertainCount = over.size - confirmed.size
-    val list = if (onlyOver) over else all
+    val base = if (onlyOver) over else all
+    // ثقة 0 (غير معروفة) بتتحط في الآخر عند الترتيب بالأضعف
+    val list = if (weakFirst) base.sortedBy { if (it.speedConf == 0) 101 else it.speedConf } else base
+    val qHigh = remember(allRecords) { allRecords.count { it.speedKmh >= 0 && it.speedConf >= 75 } }
+    val qMid = remember(allRecords) { allRecords.count { it.speedKmh >= 0 && it.speedConf in 50..74 } }
+    val qLow = remember(allRecords) { allRecords.count { it.speedKmh >= 0 && it.speedConf in 1..49 } }
     val maxSpeed = measured.maxOfOrNull { it.speedKmh }
     val rate = if (measured.isEmpty()) 0f else confirmed.size.toFloat() / measured.size
 
@@ -106,9 +112,9 @@ fun VehiclesScreen(vm: MainViewModel) {
                 TextButton(onClick = {
                     if (all2) vm.clearAll() else vm.deleteMany(list)
                     confirm = 0
-                }) { Text("حذف", color = MaterialTheme.colorScheme.error) }
+                }) { BtnText("حذف") }
             },
-            dismissButton = { TextButton(onClick = { confirm = 0 }) { Text("إلغاء") } }
+            dismissButton = { TextButton(onClick = { confirm = 0 }) { BtnText("إلغاء") } }
         )
     }
     delOne?.let { r ->
@@ -117,9 +123,9 @@ fun VehiclesScreen(vm: MainViewModel) {
             title = { Text("حذف المركبة دي؟") },
             text = { Text("هيتم حذف المركبة المسجلة في ${fmt.format(Date(r.timestamp))} ومعاها لقطة الإثبات (لو فيه).") },
             confirmButton = {
-                TextButton(onClick = { vm.delete(r); delOne = null }) { Text("حذف", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { vm.delete(r); delOne = null }) { BtnText("حذف") }
             },
-            dismissButton = { TextButton(onClick = { delOne = null }) { Text("إلغاء") } }
+            dismissButton = { TextButton(onClick = { delOne = null }) { BtnText("إلغاء") } }
         )
     }
 
@@ -167,6 +173,13 @@ fun VehiclesScreen(vm: MainViewModel) {
                         }
                         Switch(checked = reliableOnly, onCheckedChange = { reliableOnly = it })
                     }
+                    // توزيع جودة القياسات: عالية / متوسطة / ضعيفة (الضعيفة غالباً تتبع ضعيف أو الكاميرا اتحركت)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        QualityTile(Modifier.weight(1f), "عالية", qHigh, Color(0xFF2E7D32))
+                        QualityTile(Modifier.weight(1f), "متوسطة", qMid, AMBER)
+                        QualityTile(Modifier.weight(1f), "ضعيفة", qLow, MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    FilterChip(weakFirst, { weakFirst = !weakFirst }, { Text("الأضعف ثقة أولاً") })
                 }
             }
 
@@ -216,13 +229,13 @@ fun VehiclesScreen(vm: MainViewModel) {
                 }
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(enabled = list.isNotEmpty(), onClick = {
                         scope.launch {
                             val f = withContext(Dispatchers.IO) { CsvExporter.build(ctx, list, s.axisHorizontal) }
                             CsvExporter.share(ctx, f)
                         }
-                    }) { Icon(Icons.Filled.Share, null); Spacer(Modifier.width(4.dp)); Text("مشاركة Excel") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("مشاركة Excel") }
                     OutlinedButton(enabled = list.isNotEmpty(), onClick = {
                         scope.launch {
                             val ok = withContext(Dispatchers.IO) {
@@ -230,7 +243,7 @@ fun VehiclesScreen(vm: MainViewModel) {
                             }
                             Toast.makeText(ctx, if (ok) "تم الحفظ في مجلد التنزيلات" else "فشل الحفظ", Toast.LENGTH_LONG).show()
                         }
-                    }) { Icon(Icons.Filled.Download, null); Spacer(Modifier.width(4.dp)); Text("حفظ في التنزيلات") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("حفظ بالتنزيلات") }
                 }
             }
 
@@ -238,15 +251,17 @@ fun VehiclesScreen(vm: MainViewModel) {
             item {
                 AppCard {
                     SectionTitle(Icons.Filled.Delete, "حذف المركبات")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
+                            modifier = Modifier.weight(1f), contentPadding = BtnPadding,
                             enabled = list.isNotEmpty(), onClick = { confirm = 1 },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = red)
-                        ) { Text("حذف المعروض (${list.size})") }
+                        ) { BtnText("حذف المعروض (${list.size})") }
                         Button(
+                            modifier = Modifier.weight(1f), contentPadding = BtnPadding,
                             enabled = allRecords.isNotEmpty(), onClick = { confirm = 2 },
                             colors = ButtonDefaults.buttonColors(containerColor = red)
-                        ) { Text("حذف الكل (${allRecords.size})") }
+                        ) { BtnText("حذف الكل (${allRecords.size})") }
                     }
                     Text(
                         "\"حذف المعروض\" بيمسح اللي ظاهر حسب الفلتر (المتجاوزين أو الموثوقة بس). وفيه زرار حذف على كل مركبة لوحدها.",
@@ -390,6 +405,17 @@ private fun VehicleRow(r: SpeedRecord, limit: Float, fmt: SimpleDateFormat, onDe
     }
 }
 
+@Composable
+private fun QualityTile(modifier: Modifier, label: String, count: Int, color: Color) {
+    Column(
+        modifier.clip(RoundedCornerShape(12.dp)).background(color.copy(alpha = 0.12f)).padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("$count", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = color)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
+    }
+}
+
 /** مؤشر ثقة قراءة السرعة: أخضر عالية، كهرماني متوسطة، رمادي ضعيفة (مش أحمر عشان ما يتلخبطش مع التجاوز). */
 @Composable
 private fun ConfidenceTag(conf: Int) {
@@ -428,8 +454,8 @@ private fun EvidenceDialog(path: String, onClose: () -> Unit) {
             }
         },
         confirmButton = {
-            if (bmp != null) TextButton(onClick = { Evidence.share(ctx, path) }) { Text("مشاركة") }
+            if (bmp != null) TextButton(onClick = { Evidence.share(ctx, path) }) { BtnText("مشاركة") }
         },
-        dismissButton = { TextButton(onClick = onClose) { Text("إغلاق") } }
+        dismissButton = { TextButton(onClick = onClose) { BtnText("إغلاق") } }
     )
 }

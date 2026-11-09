@@ -66,6 +66,9 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
     val streamStatus by vm.host.streamStatus.collectAsStateWithLifecycle()
     var showCalib by remember { mutableStateOf(false) }
     var perspMode by remember { mutableStateOf(false) }
+    val stab by vm.engine.stability.state.collectAsStateWithLifecycle()
+    var moveDismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(stab.level) { if (stab.level < 2) moveDismissed = false }
     var hasPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
@@ -117,7 +120,7 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
             Text("نحتاج إذن الكاميرا", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text("الكاميرا هي مصدر القياس الوحيد. لا يتم حفظ صور إلا لقطات إثبات المتجاوزين (ويمكن إيقافها من الإعدادات).", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { Text("منح الإذن") }
+            Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { BtnText("منح الإذن") }
         }
         return
     }
@@ -198,6 +201,10 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                             Pill(if (running) "يعمل" else "متوقف", if (running) Color(0xFF2E7D32) else Color(0xFF616161))
                             Pill("FPS ${ov.fps}", Color(0xFF263238))
                             Pill("عدّ ${ov.sessionCount}", Color(0xFF263238))
+                            if (stab.hasRef && s.movedGuard) Pill(
+                                "ثبات ${stab.score}%",
+                                when (stab.level) { 0 -> Color(0xFF2E7D32); 1 -> Color(0xFFE65100); else -> Color(0xFFB71C1C) }
+                            )
                         }
                         val info = buildList {
                             add("كشف ${ov.detMs}ms")
@@ -215,6 +222,27 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                             modifier = Modifier.align(Alignment.Center).padding(24.dp)
                                 .clip(RoundedCornerShape(12.dp)).background(Color(0xE6B71C1C)).padding(14.dp)
                         )
+                    }
+                    if (stab.level == 2 && s.movedGuard && !moveDismissed && !perspMode) {
+                        Column(
+                            Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 56.dp)
+                                .clip(RoundedCornerShape(14.dp)).background(Color(0xF0B71C1C)).padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("⚠ " + stab.message, color = Color.White, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { vm.engine.stability.captureReference() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFFB71C1C)),
+                                    contentPadding = BtnPadding, modifier = Modifier.weight(1f)
+                                ) { BtnText("اعتمد المكان الجديد") }
+                                OutlinedButton(
+                                    onClick = { moveDismissed = true },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                    contentPadding = BtnPadding, modifier = Modifier.weight(1f)
+                                ) { BtnText("تجاهل") }
+                            }
+                        }
                     }
                     if (ov.lastEvent.isNotEmpty() && !perspMode) {
                         Text(
@@ -270,7 +298,7 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                             Text(if (running) "إيقاف" else "بدء", maxLines = 1, softWrap = false)
                         }
                         FilledTonalButton(
-                            onClick = { showCalib = !showCalib; if (showCalib) perspMode = false },
+                            onClick = { showCalib = !showCalib; perspMode = false },
                             contentPadding = PaddingValues(horizontal = 8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
@@ -288,7 +316,7 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                             Text(if (perspMode) "تم" else "منظور", maxLines = 1, softWrap = false)
                         }
                     }
-                    if (perspMode) {
+                    if (perspMode && !showCalib) {
                         Column(
                             Modifier.heightIn(max = panelMax).verticalScroll(rememberScrollState())
                                 .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
@@ -301,7 +329,11 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                             Modifier.heightIn(max = panelMax).verticalScroll(rememberScrollState())
                                 .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
                         ) {
-                            CalibrationControls(s, vm::update, fpsSlow)
+                            CalibrationWizard(
+                                vm, s, fpsSlow,
+                                onPerspMode = { perspMode = it },
+                                onClose = { showCalib = false; perspMode = false }
+                            )
                         }
                     }
                 }

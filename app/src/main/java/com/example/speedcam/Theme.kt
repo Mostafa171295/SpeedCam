@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 val Navy = Color(0xFF0B1F3A)
 val NavyLight = Color(0xFF12304F)
@@ -88,3 +89,20 @@ fun SectionTitle(icon: ImageVector, text: String) {
         Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     }
 }
+
+/** نص موحّد جوه الزراير: سطر واحد، من غير تقطيع على سطرين، وبيتقصّ بـ … لو المساحة ضيقة جداً. */
+@Composable
+fun BtnText(text: String, modifier: Modifier = Modifier, maxLines: Int = 1) {
+    Text(
+        text,
+        modifier = modifier,
+        maxLines = maxLines,
+        softWrap = maxLines > 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        fontSize = 13.sp,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
+}
+
+/** المسافة الداخلية الموحدة للزراير اللي في صفوف ضيقة. */
+val BtnPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)

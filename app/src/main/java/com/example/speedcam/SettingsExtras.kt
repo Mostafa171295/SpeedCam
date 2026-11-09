@@ -144,7 +144,7 @@ fun StabilityCard(vm: MainViewModel, s: AppSettings) {
             } catch (_: Throwable) {
                 Toast.makeText(ctx, "افتح إعدادات البطارية يدوياً واسمح للتطبيق بالعمل في الخلفية", Toast.LENGTH_LONG).show()
             }
-        }) { Text("استثناء التطبيق من توفير البطارية") }
+        }, modifier = Modifier.fillMaxWidth()) { BtnText("استثناء التطبيق من توفير البطارية", maxLines = 2) }
 
         ToggleRow("حماية الحرارة والبطارية", s.thermalGuard) { v -> vm.update { it.copy(thermalGuard = v) } }
         Text(
@@ -233,7 +233,7 @@ fun SourceCard(vm: MainViewModel, s: AppSettings) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 modifier = Modifier.fillMaxWidth()
             )
-            Button(onClick = { vm.update { it.copy(streamUrl = url.trim()) } }) { Text("حفظ واتصال") }
+            Button(onClick = { vm.update { it.copy(streamUrl = url.trim()) } }) { BtnText("حفظ واتصال") }
             Text("الحالة: " + status.ifBlank { "—" }, fontWeight = FontWeight.Bold)
             Text(
                 "المدعوم: بث MJPEG عبر HTTP على نفس الشبكة (كاميرات IP كتير، أو موبايل قديم بتطبيق بيبث كاميرا). المسار بيختلف من كاميرا لكاميرا، راجع دليلها. " +

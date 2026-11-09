@@ -35,6 +35,10 @@ class SpeedEngine(
     private val detLock = Any()
     private val tracker = SpeedTracker()
 
+    /** مراقب ثبات الكاميرا: مرجع محفوظ + كشف الإزاحة والاهتزاز (بيأثر على ثقة القياسات). */
+    val stability = CameraStability(context.applicationContext)
+    @Volatile private var movedAlerted = false
+
     // تصنيف النوع في الوضع السريع بيتم على خيط مستقل عشان ما يبطّئش الكاميرا
     private val classifier = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
@@ -121,13 +125,16 @@ class SpeedEngine(
 
     override fun analyze(image: ImageProxy) {
         try {
-            if (!ready()) return
+            val on = ready()
+            // حتى والقياس واقف: لو الويزارد طلب حفظ مرجع نلتقط الفريم ده بس
+            if (!on && !stability.wantsFrame()) return
             val nowMs = SystemClock.elapsedRealtime()
             val raw = image.toBitmap()
             val rot = image.imageInfo.rotationDegrees
             val frame = if (rot == 0) raw else Bitmap.createBitmap(
                 raw, 0, 0, raw.width, raw.height, Matrix().apply { postRotate(rot.toFloat()) }, true
             )
+            if (!on) { stability.offer(frame, nowMs, true); return }
             process(frame, image.imageInfo.timestamp, nowMs)
         } catch (t: Throwable) {
             Log.e(TAG, "analyze failed", t)
@@ -143,7 +150,10 @@ class SpeedEngine(
     fun analyzeFrame(frame: Bitmap, tsNs: Long) {
         try {
             previewFrame.value = frame
-            if (!ready()) return
+            if (!ready()) {
+                if (stability.wantsFrame()) stability.offer(frame, SystemClock.elapsedRealtime(), true)
+                return
+            }
             process(frame, tsNs, SystemClock.elapsedRealtime())
         } catch (t: Throwable) {
             Log.e(TAG, "analyzeFrame failed", t)
@@ -153,6 +163,7 @@ class SpeedEngine(
     private fun process(frame: Bitmap, tsNs: Long, nowMs: Long) {
             val tPrep = SystemClock.elapsedRealtime()
             val s = settings()
+            checkStability(frame, nowMs, s)
             val aspect = frame.width.toFloat() / frame.height
 
             if (s.fastMode) {
@@ -451,10 +462,31 @@ class SpeedEngine(
         }
     }
 
-    private fun handleEvent(ev: SpeedEvent, plate: PlateHit? = null, waitPlate: Boolean = false, evidence: Bitmap? = null) {
+    /** ثبات الكاميرا بيخفّض ثقة القياس: الإزاحة/الاهتزاز معناهم إن مسافة المعايرة ممكن ماتبقاش صح. */
+    private fun checkStability(frame: Bitmap, nowMs: Long, s: AppSettings) {
+        stability.offer(frame, nowMs, s.movedGuard)
+        val st = stability.state.value
+        if (s.movedGuard && st.level == 2) {
+            if (!movedAlerted) {
+                movedAlerted = true
+                raise("الكاميرا اتحركت", st.message, true, 10 * 60_000L)
+            }
+        } else if (st.level < 2) movedAlerted = false
+    }
+
+    private fun withStability(ev: SpeedEvent): SpeedEvent {
+        val st = stability.state.value
+        if (!settings().movedGuard || !st.hasRef || ev.speedKmh < 0 || ev.conf <= 0) return ev
+        var c = ev.conf * st.score / 100
+        if (st.level == 2) c = minOf(c, 40)   // الكاميرا اتحركت: القراءة مش موثوقة لحد ما تتعاير تاني
+        return ev.copy(conf = c.coerceIn(1, 100))
+    }
+
+    private fun handleEvent(ev0: SpeedEvent, plate: PlateHit? = null, waitPlate: Boolean = false, evidence: Bitmap? = null) {
+        val ev = withStability(ev0)
         sessionCount++
         checkAnomalies(ev)
-        val baseText = if (ev.speedKmh < 0) "${ev.type.ar}: تم العد" else "${ev.type.ar}: ${ev.speedKmh.roundToInt()} كم/س"
+        val baseText = if (ev.speedKmh < 0) "${ev.type.ar}: تم العد" else "${ev.type.ar}: ${ev.speedKmh.roundToInt()} كم/س" + (if (ev.conf in 1..49) "  ⚠ ثقة ضعيفة" else "")
         lastEvent = baseText
         val ts = System.currentTimeMillis()
         scope.launch(Dispatchers.IO) {

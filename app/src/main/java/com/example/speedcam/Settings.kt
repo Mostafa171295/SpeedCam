@@ -54,7 +54,9 @@ data class AppSettings(
     val siteLat: String = "",             // موقع الكاميرا (خط العرض) لمطابقة مرور مركبة المرجع
     val siteLon: String = "",
     val sourceMode: Int = 0,              // 0 = كاميرا الموبايل ، 1 = كاميرا على الشبكة (MJPEG عبر HTTP)
-    val streamUrl: String = ""
+    val streamUrl: String = "",
+    // ---- ثبات الكاميرا ----
+    val movedGuard: Boolean = true        // إنذار لو الكاميرا اتحركت عن المرجع المحفوظ، وتخفيض ثقة القياسات وقتها
 )
 
 class SettingsStore(ctx: Context) {
@@ -105,7 +107,8 @@ class SettingsStore(ctx: Context) {
             siteLat = p.getString("siteLat", d.siteLat) ?: "",
             siteLon = p.getString("siteLon", d.siteLon) ?: "",
             sourceMode = p.getInt("sourceMode", d.sourceMode),
-            streamUrl = p.getString("streamUrl", d.streamUrl) ?: ""
+            streamUrl = p.getString("streamUrl", d.streamUrl) ?: "",
+            movedGuard = p.getBoolean("movedGuard", d.movedGuard)
         )
     }
 
@@ -150,6 +153,7 @@ class SettingsStore(ctx: Context) {
             .putString("siteLon", s.siteLon)
             .putInt("sourceMode", s.sourceMode)
             .putString("streamUrl", s.streamUrl)
+            .putBoolean("movedGuard", s.movedGuard)
             .apply()
     }
 }

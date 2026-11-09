@@ -313,7 +313,7 @@ fun VideoTestCard(vm: MainViewModel) {
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Button(onClick = { picker.launch("video/*") }, enabled = !running) {
-            Text(if (uri == null) "اختيار فيديو" else "تغيير الفيديو")
+            BtnText(if (uri == null) "اختيار فيديو" else "تغيير الفيديو")
         }
         preview?.let { bmp ->
             Box(Modifier.fillMaxWidth().aspectRatio(bmp.width.toFloat() / bmp.height).clip(RoundedCornerShape(10.dp))) {
@@ -341,9 +341,9 @@ fun VideoTestCard(vm: MainViewModel) {
                 FilterChip(fps == v, { fps = v }, { Text("$v") }, enabled = !running)
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = uri != null && !running, onClick = { start() }) { Text("ابدأ التحليل") }
-            if (running) OutlinedButton(onClick = { job?.cancel() }) { Text("إيقاف") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = uri != null && !running, onClick = { start() }, modifier = Modifier.weight(1f)) { BtnText("ابدأ التحليل") }
+            if (running) OutlinedButton(onClick = { job?.cancel() }, modifier = Modifier.weight(1f)) { BtnText("إيقاف") }
         }
         if (running) {
             Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
@@ -411,7 +411,7 @@ private fun VideoRowItem(row: VideoAnalyzer.Row, s: AppSettings, real: Float?, o
                     style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold,
                     color = if (bad) MaterialTheme.colorScheme.error else Color(0xFF2E7D32)
                 )
-                TextButton(onClick = { onAddSample(real) }) { Text("أضف كعينة معايرة") }
+                TextButton(onClick = { onAddSample(real) }) { BtnText("أضف كعينة معايرة") }
             }
         }
     }

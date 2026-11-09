@@ -206,7 +206,7 @@ fun PerspectivePanel(
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { update { it.copy(homoPts = Geo.encodePts(Geo.defaultPts())) } }) { Text("إعادة النقط") }
+            OutlinedButton(onClick = { update { it.copy(homoPts = Geo.encodePts(Geo.defaultPts())) } }) { BtnText("إعادة النقط") }
         }
     }
 }

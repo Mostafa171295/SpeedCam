@@ -81,7 +81,7 @@ fun CalibrationControls(s: AppSettings, update: ((AppSettings) -> AppSettings) -
  * عينة أو اتنين → معامل نسبة. تلات عينات فأكتر بسرعات متباعدة → انحدار خطي: حقيقية = a × خام + b.
  */
 @Composable
-private fun SpeedCalibrationBox(s: AppSettings, update: ((AppSettings) -> AppSettings) -> Unit) {
+internal fun SpeedCalibrationBox(s: AppSettings, update: ((AppSettings) -> AppSettings) -> Unit) {
     var real by remember { mutableStateOf("") }
     var read by remember { mutableStateOf("") }
     val r = real.replace(',', '.').toFloatOrNull()
@@ -105,18 +105,18 @@ private fun SpeedCalibrationBox(s: AppSettings, update: ((AppSettings) -> AppSet
             OutlinedTextField(real, { real = it }, label = { Text("السرعة الحقيقية") }, keyboardOptions = dec, singleLine = true, modifier = Modifier.weight(1f))
             OutlinedTextField(read, { read = it }, label = { Text("قراءة التطبيق") }, keyboardOptions = dec, singleLine = true, modifier = Modifier.weight(1f))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = r != null && a != null && r > 0f && a > 0f, onClick = {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(modifier = Modifier.weight(1f), contentPadding = BtnPadding, enabled = r != null && a != null && r > 0f && a > 0f, onClick = {
                 // نرجّع القراءة المعروضة للقيمة الخام (قبل المعايرة الحالية)
                 val raw = (a!! - s.speedOffset) / s.speedCalib
                 if (raw > 0f) {
                     commit((samples + Calibration.Sample(r!!, raw)).takeLast(MAX_CAL_SAMPLES))
                     real = ""; read = ""
                 }
-            }) { Text("أضف عينة") }
-            OutlinedButton(enabled = samples.isNotEmpty() || s.speedCalib != 1f || s.speedOffset != 0f, onClick = {
+            }) { BtnText("أضف عينة") }
+            OutlinedButton(modifier = Modifier.weight(1f), contentPadding = BtnPadding, enabled = samples.isNotEmpty() || s.speedCalib != 1f || s.speedOffset != 0f, onClick = {
                 update { it.copy(speedCalib = 1f, speedOffset = 0f, calSamples = "") }
-            }) { Text("مسح المعايرة") }
+            }) { BtnText("مسح المعايرة") }
         }
         val b = s.speedOffset
         Text(

@@ -110,19 +110,19 @@ fun GpsCalibCard(vm: MainViewModel, s: AppSettings) {
         )
 
         Text("١) على موبايل المرجع (اللي جوه العربية)", fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = !rec, onClick = { ask(1) }) { Text("بدء تسجيل GPS") }
-            OutlinedButton(enabled = rec, onClick = {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = !rec, onClick = { ask(1) }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { BtnText("بدء تسجيل GPS") }
+            OutlinedButton(enabled = rec, modifier = Modifier.weight(1f), contentPadding = BtnPadding, onClick = {
                 val name = GpsRef.stop(ctx)
                 msg = if (name != null) "اتحفظ الملف $name في التنزيلات. انقله لموبايل الكاميرا." else "التسجيل كان قصير أو فشل الحفظ."
-            }) { Text("إيقاف وحفظ") }
+            }) { BtnText("إيقاف وحفظ") }
         }
         if (rec) Text("بيسجل: $cnt قراءة • السرعة الحالية ${kmh.toInt()} كم/س • دقة الموقع ${acc.toInt()} م", style = MaterialTheme.typography.bodySmall)
 
         Text("٢) على موبايل الكاميرا", fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(enabled = !fixing, onClick = { ask(2) }) { Text("تحديد موقع الكاميرا") }
-            Button(onClick = { importer.launch("*/*") }) { Text("استيراد ملف GPS ومطابقته") }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(enabled = !fixing, onClick = { ask(2) }, modifier = Modifier.fillMaxWidth()) { BtnText("تحديد موقع الكاميرا") }
+            Button(onClick = { importer.launch("*/*") }, modifier = Modifier.fillMaxWidth()) { BtnText("استيراد ملف GPS ومطابقته") }
         }
         Text(
             if (s.siteLat.isNotBlank()) "موقع الكاميرا المحفوظ: ${s.siteLat.take(9)} ، ${s.siteLon.take(9)}" else "موقع الكاميرا لسه ماتحددش.",
@@ -159,7 +159,7 @@ fun GpsCalibCard(vm: MainViewModel, s: AppSettings) {
                 vm.update { it.copy(speedCalib = fa, speedOffset = fb, calSamples = Calibration.encode(list)) }
                 matches = emptyList()
                 msg = "اتضافت ${add.size} عينة للمعايرة. شوف دقة جهازك في كارت معايرة السرعة."
-            }) { Text("إضافة المقبول (${good.size}) كعينات معايرة") }
+            }, modifier = Modifier.fillMaxWidth()) { BtnText("إضافة المقبول (${good.size}) كعينات معايرة", maxLines = 2) }
             Text(
                 "مهم: السرعة الخام بتتحسب بعكس معايرتك الحالية، فماتغيّرش المعايرة بين القياس والمطابقة. " +
                     "لو معايرتك الحالية مش صفر خطأ، الأفضل تعمل \"إعادة ضبط\" للمعايرة قبل ما تعمل جولة القياس.",

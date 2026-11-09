@@ -260,7 +260,7 @@ fun StatsScreen(vm: MainViewModel) {
                                 val f = withContext(Dispatchers.IO) { CsvExporter.buildVolume(ctx, buckets, groupDay) }
                                 CsvExporter.share(ctx, f)
                             }
-                        }) { Icon(Icons.Filled.Share, null); Spacer(Modifier.width(4.dp)); Text("تصدير تقرير الحجم Excel") }
+                        }, modifier = Modifier.fillMaxWidth(), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("تصدير تقرير الحجم Excel") }
                     }
                 }
 
@@ -298,13 +298,13 @@ fun StatsScreen(vm: MainViewModel) {
             }
 
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Button(enabled = list.isNotEmpty(), onClick = {
                         scope.launch {
                             val f = withContext(Dispatchers.IO) { CsvExporter.build(ctx, list, settings.axisHorizontal) }
                             CsvExporter.share(ctx, f)
                         }
-                    }) { Icon(Icons.Filled.Share, null); Spacer(Modifier.width(4.dp)); Text("مشاركة Excel") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("مشاركة Excel") }
                     OutlinedButton(enabled = list.isNotEmpty(), onClick = {
                         scope.launch {
                             val ok = withContext(Dispatchers.IO) {
@@ -312,7 +312,7 @@ fun StatsScreen(vm: MainViewModel) {
                             }
                             Toast.makeText(ctx, if (ok) "تم الحفظ في مجلد التنزيلات" else "فشل الحفظ", Toast.LENGTH_LONG).show()
                         }
-                    }) { Icon(Icons.Filled.Download, null); Spacer(Modifier.width(4.dp)); Text("حفظ في التنزيلات") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("حفظ بالتنزيلات") }
                     IconButton(enabled = all.isNotEmpty(), onClick = { confirmClear = true }) { Icon(Icons.Filled.Delete, "مسح الكل") }
                 }
             }
@@ -353,8 +353,8 @@ fun StatsScreen(vm: MainViewModel) {
             onDismissRequest = { confirmClear = false },
             title = { Text("مسح كل البيانات؟") },
             text = { Text("سيتم حذف كل القراءات نهائياً.") },
-            confirmButton = { TextButton({ vm.clearAll(); confirmClear = false }) { Text("مسح") } },
-            dismissButton = { TextButton({ confirmClear = false }) { Text("إلغاء") } }
+            confirmButton = { TextButton({ vm.clearAll(); confirmClear = false }) { BtnText("مسح") } },
+            dismissButton = { TextButton({ confirmClear = false }) { BtnText("إلغاء") } }
         )
     }
 }

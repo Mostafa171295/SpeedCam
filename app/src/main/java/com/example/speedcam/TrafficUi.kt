@@ -102,7 +102,7 @@ fun AnomalyCard(items: List<AnomalyRecord>, onClear: () -> Unit) {
                 }
             }
             if (items.size > 30) Text("(معروض آخر 30 حالة)", style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = onClear) { Text("مسح السجل") }
+            OutlinedButton(onClick = onClear) { BtnText("مسح السجل") }
         }
     }
 }

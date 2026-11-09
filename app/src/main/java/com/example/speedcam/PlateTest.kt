@@ -121,9 +121,9 @@ fun PlateTestCard(vm: MainViewModel) {
                 color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = !busy, onClick = { picker.launch("image/*") }) { Text("اختيار صورة") }
-            OutlinedButton(enabled = !busy && src != null, onClick = { rot = (rot + 90) % 360; run() }) { Text("تدوير 90°") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = !busy, onClick = { picker.launch("image/*") }, modifier = Modifier.weight(1f)) { BtnText("اختيار صورة") }
+            OutlinedButton(modifier = Modifier.weight(1f), enabled = !busy && src != null, onClick = { rot = (rot + 90) % 360; run() }) { BtnText("تدوير 90°") }
         }
         if (busy) Text("جاري القراءة...", style = MaterialTheme.typography.bodySmall)
         if (msg.isNotEmpty()) Text(msg, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
