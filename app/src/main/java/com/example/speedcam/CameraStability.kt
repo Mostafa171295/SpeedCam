@@ -149,7 +149,7 @@ class CameraStability(ctx: Context) {
             var bestDx = 0
             var bestDy = 0
             var second = Long.MAX_VALUE
-            for (dy in -R..R) for (dx in -R..R) {
+            for (dy in -SEARCH_R..SEARCH_R) for (dx in -SEARCH_R..SEARCH_R) {
                 val d = sad(a, b, w, h, x0, y0, bw, bh, dx, dy)
                 if (d < best) { second = best; best = d; bestDx = dx; bestDy = dy } else if (d < second) second = d
             }
@@ -220,7 +220,7 @@ class CameraStability(ctx: Context) {
 
     private companion object {
         const val GW = 96              // عرض الصورة المصغّرة
-        const val R = 5                // مدى البحث ±بكسل (≈ ±5% من العرض)
+        const val SEARCH_R = 5                // مدى البحث ±بكسل (≈ ±5% من العرض)
         const val CHECK_MS = 1000L
         const val RECENT_N = 8
         const val MOVED_PCT = 1.5f     // إزاحة أكبر من 1.5% من العرض = اتحركت
