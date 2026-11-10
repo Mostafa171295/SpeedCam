@@ -68,14 +68,14 @@ class CameraStability(ctx: Context) {
             ref = g; refW = w; refH = h
             recent.clear(); movedStreak = 0
             save(g, w, h)
-            state.value = CamStability(hasRef = true, message = "تم حفظ المرجع")
+            state.value = CamStability(hasRef = true, message = tr(R.string.str_0062))
             return
         }
         val r = ref
         if (r == null) { if (state.value.hasRef) state.value = CamStability(); return }
         if (w != refW || h != refH) {
             // نسبة الصورة اتغيرت (كاميرا تانية أو دوران): المرجع مش صالح
-            state.value = CamStability(hasRef = true, level = 2, score = 20, message = "الصورة اتغيرت عن المرجع (دوران/كاميرا تانية). احفظ مرجع جديد.")
+            state.value = CamStability(hasRef = true, level = 2, score = 20, message = tr(R.string.str_0063))
             return
         }
         val (dx, dy, quality) = estimateShift(r, g, w, h)
@@ -107,9 +107,9 @@ class CameraStability(ctx: Context) {
             else -> 0
         }
         val msg = when {
-            moved -> "الكاميرا اتحركت حوالي ${fmt(shiftPct)}% من عرض الصورة، والمعايرة ممكن تكون ماتبقتش صح"
-            level == 1 && jitterPct >= 0.35f -> "الموبايل بيهتز، ثبّته أكتر"
-            level == 1 -> "إزاحة بسيطة عن المرجع (${fmt(shiftPct)}%)"
+            moved -> tr(R.string.str_0064, fmt(shiftPct))
+            level == 1 && jitterPct >= 0.35f -> tr(R.string.str_0065)
+            level == 1 -> tr(R.string.str_0066, fmt(shiftPct))
             else -> ""
         }
         state.value = CamStability(true, level, s, shiftPct, jitterPct, msg)

@@ -2,7 +2,9 @@ package com.example.speedcam
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -44,15 +46,15 @@ fun PlateScreen(vm: MainViewModel) {
     val list = if (onlyPlates) all.filter { it.plateDigits.isNotEmpty() } else all
 
     Column(Modifier.fillMaxSize()) {
-        AppHeader("اللوحات", "لوحات المركبات المسجلة مع سرعتها")
+        AppHeader(tr(R.string.str_0127), tr(R.string.str_0142))
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 AppCard {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
-                            Text("قراءة اللوحات أثناء القياس", fontWeight = FontWeight.Bold)
+                            Text(tr(R.string.str_0143), fontWeight = FontWeight.Bold)
                             Text(
-                                "كل مركبة بتعدّي بتتسجل لوحتها مع سرعتها في نفس الصف.",
+                                tr(R.string.str_0144),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -61,22 +63,34 @@ fun PlateScreen(vm: MainViewModel) {
                             if (on) vm.plateReader.ensureData()
                         })
                     }
+                    if (s.readPlates) {
+                        Text(tr(R.string.plate_fmt_title), fontWeight = FontWeight.Bold)
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            (listOf(PlateProfile.AUTO to tr(R.string.plate_fmt_auto)) + PlateProfile.ALL.map { it.id to tr(it.nameRes) }).forEach { (id, label) ->
+                                FilterChip(s.plateFormat == id, { vm.update { it.copy(plateFormat = id) } }, { Text(label) })
+                            }
+                        }
+                        Text(
+                            tr(R.string.plate_fmt_hint),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     when {
                         !s.readPlates -> Unit
                         dataState == PLATE_DATA_FAILED -> {
                             Text(
-                                "تعذّر تجهيز اللغة العربية للقراءة. تأكد من الإنترنت ثم أعد المحاولة (أو حط ملف ara.traineddata داخل app/src/main/assets وأعد التثبيت).",
+                                tr(R.string.str_0145, vm.plateReader.dataFileName()),
                                 color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall
                             )
-                            Button(onClick = { vm.plateReader.ensureData() }) { BtnText("إعادة المحاولة") }
+                            Button(onClick = { vm.plateReader.ensureData() }) { BtnText(tr(R.string.str_0146)) }
                         }
                         dataState == PLATE_DATA_READY -> Text(
-                            "جاهز. اللوحة بتتقرأ أحسن لما الكاميرا قريبة من المركبات، ومع تفعيل \"دقة عالية\" في الإعدادات.",
+                            tr(R.string.str_0147),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         else -> Text(
-                            if (dataState == PLATE_DATA_DOWNLOADING) "جاري تحميل ملف اللغة العربية (مرة واحدة فقط، حوالي 2 ميجا)..."
-                            else "جاري التجهيز...",
+                            if (dataState == PLATE_DATA_DOWNLOADING) tr(R.string.str_0148)
+                            else tr(R.string.str_0149),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -87,8 +101,8 @@ fun PlateScreen(vm: MainViewModel) {
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    FilterChip(onlyPlates, { onlyPlates = true }, { Text("اللوحات المقروءة ($withPlate)") })
-                    FilterChip(!onlyPlates, { onlyPlates = false }, { Text("كل القياسات (${all.size})") })
+                    FilterChip(onlyPlates, { onlyPlates = true }, { Text(tr(R.string.str_0150, withPlate)) })
+                    FilterChip(!onlyPlates, { onlyPlates = false }, { Text(tr(R.string.str_0151, all.size)) })
                 }
             }
 
@@ -99,16 +113,16 @@ fun PlateScreen(vm: MainViewModel) {
                             val f = withContext(Dispatchers.IO) { CsvExporter.build(ctx, list, s.axisHorizontal) }
                             CsvExporter.share(ctx, f)
                         }
-                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("مشاركة Excel") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText(tr(R.string.str_0152)) }
                     OutlinedButton(enabled = list.isNotEmpty(), onClick = {
                         scope.launch {
                             val ok = withContext(Dispatchers.IO) {
                                 CsvExporter.saveToDownloads(ctx, CsvExporter.build(ctx, list, s.axisHorizontal))
                             }
-                            Toast.makeText(ctx, if (ok) "تم الحفظ في مجلد التنزيلات" else "فشل الحفظ", Toast.LENGTH_LONG).show()
+                            Toast.makeText(ctx, if (ok) tr(R.string.str_0153) else tr(R.string.str_0154), Toast.LENGTH_LONG).show()
                         }
-                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("حفظ بالتنزيلات") }
-                    IconButton(enabled = all.isNotEmpty(), onClick = { confirmClear = true }) { Icon(Icons.Filled.Delete, "مسح الكل") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText(tr(R.string.str_0155)) }
+                    IconButton(enabled = all.isNotEmpty(), onClick = { confirmClear = true }) { Icon(Icons.Filled.Delete, tr(R.string.str_0156)) }
                 }
             }
 
@@ -116,9 +130,9 @@ fun PlateScreen(vm: MainViewModel) {
                 item {
                     AppCard {
                         Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("لا توجد لوحات مسجلة بعد", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(tr(R.string.str_0157), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(
-                                "شغّل القياس من تبويب الكاميرا وسيظهر هنا كل مركبة معدّية مع لوحتها وسرعتها.",
+                                tr(R.string.str_0158),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -140,22 +154,22 @@ fun PlateScreen(vm: MainViewModel) {
                                 if (r.plateDigits.isNotEmpty()) {
                                     Text(PlateParser.display(r.plateLetters, r.plateDigits), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 } else {
-                                    Text("لوحة غير مقروءة", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(tr(R.string.str_0159), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Text(
                                     "${type?.ar ?: r.vehicleType}  •  ${fmt.format(Date(r.timestamp))}" +
-                                        (if (r.plateDigits.isNotEmpty()) "  •  ثقة ${r.plateConf}%" else ""),
+                                        (if (r.plateDigits.isNotEmpty()) tr(R.string.str_0160, r.plateConf) else ""),
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             if (r.speedKmh >= 0) {
-                                Text("${r.speedKmh.roundToInt()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                Text("كم/س", style = MaterialTheme.typography.bodySmall)
+                                Text("${Units.spdI(r.speedKmh)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text(tr(R.string.str_0161), style = MaterialTheme.typography.bodySmall)
                             } else {
-                                Text("عدّ فقط", style = MaterialTheme.typography.bodySmall)
+                                Text(tr(R.string.str_0162), style = MaterialTheme.typography.bodySmall)
                             }
                             IconButton(onClick = { vm.delete(r) }) {
-                                Icon(Icons.Filled.Delete, "حذف", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.Filled.Delete, tr(R.string.str_0163), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -167,10 +181,10 @@ fun PlateScreen(vm: MainViewModel) {
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("مسح كل البيانات؟") },
-            text = { Text("سيتم حذف كل القراءات (السرعات واللوحات) نهائياً.") },
-            confirmButton = { TextButton({ vm.clearAll(); confirmClear = false }) { BtnText("مسح") } },
-            dismissButton = { TextButton({ confirmClear = false }) { BtnText("إلغاء") } }
+            title = { Text(tr(R.string.str_0164)) },
+            text = { Text(tr(R.string.str_0165)) },
+            confirmButton = { TextButton({ vm.clearAll(); confirmClear = false }) { BtnText(tr(R.string.str_0166)) } },
+            dismissButton = { TextButton({ confirmClear = false }) { BtnText(tr(R.string.str_0167)) } }
         )
     }
 }

@@ -81,13 +81,13 @@ fun PlateTestCard(vm: MainViewModel) {
                         val dets = vm.engine.detectBoxes(img, s)
                         val best = dets.maxByOrNull { it.box.w * it.box.h }
                         if (best == null) {
-                            msg = "ما لقيتش مركبة في الصورة. جرّب تدوير الصورة أو اختار \"صورة لوحة قريبة\"."
+                            msg = tr(R.string.str_0168)
                             null
                         } else vm.plateReader.diagnose(img, best.box)
                     } else vm.plateReader.diagnose(img, null)
                 }
             } catch (t: Throwable) {
-                msg = "فشل الاختبار: ${t.message ?: ""}"
+                msg = tr(R.string.str_0169, t.message ?: "")
             } finally {
                 busy = false
             }
@@ -99,45 +99,45 @@ fun PlateTestCard(vm: MainViewModel) {
             scope.launch {
                 src = withContext(Dispatchers.IO) { try { loadBitmap(ctx, uri, 1600) } catch (_: Throwable) { null } }
                 rot = 0
-                if (src == null) msg = "تعذّر فتح الصورة" else run()
+                if (src == null) msg = tr(R.string.str_0170) else run()
             }
         }
     }
 
     AppCard {
-        SectionTitle(Icons.Filled.CreditCard, "اختبار قراءة اللوحات من صورة")
+        SectionTitle(Icons.Filled.CreditCard, tr(R.string.str_0171))
         Text(
-            "اختار صورة من المعرض (مركبة كاملة أو لوحة قريبة) وشوف التطبيق بيقرأ إيه، وفين بيغلط. " +
-                "كل ما الصورة أقرب وأوضح كل ما القراءة أحسن.",
+            tr(R.string.str_0172) +
+                tr(R.string.str_0173),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(mode == 0, { mode = 0; run() }, { Text("صورة مركبة كاملة") })
-            FilterChip(mode == 1, { mode = 1; run() }, { Text("صورة لوحة قريبة") })
+            FilterChip(mode == 0, { mode = 0; run() }, { Text(tr(R.string.str_0174)) })
+            FilterChip(mode == 1, { mode = 1; run() }, { Text(tr(R.string.str_0175)) })
         }
         if (dataState != PLATE_DATA_READY) {
             Text(
-                "ملف اللغة العربية لسه مش جاهز (فعّل قراءة اللوحات فوق وانتظر التحميل، أو حط ara.traineddata في assets).",
+                tr(R.string.str_0176, vm.plateReader.dataFileName()),
                 color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall
             )
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = !busy, onClick = { picker.launch("image/*") }, modifier = Modifier.weight(1f)) { BtnText("اختيار صورة") }
-            OutlinedButton(modifier = Modifier.weight(1f), enabled = !busy && src != null, onClick = { rot = (rot + 90) % 360; run() }) { BtnText("تدوير 90°") }
+            Button(enabled = !busy, onClick = { picker.launch("image/*") }, modifier = Modifier.weight(1f)) { BtnText(tr(R.string.str_0177)) }
+            OutlinedButton(modifier = Modifier.weight(1f), enabled = !busy && src != null, onClick = { rot = (rot + 90) % 360; run() }) { BtnText(tr(R.string.str_0178)) }
         }
-        if (busy) Text("جاري القراءة...", style = MaterialTheme.typography.bodySmall)
+        if (busy) Text(tr(R.string.str_0179), style = MaterialTheme.typography.bodySmall)
         if (msg.isNotEmpty()) Text(msg, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
 
         diag?.let { d ->
             Text(d.note, style = MaterialTheme.typography.bodySmall)
             val best = d.best
             Text(
-                if (best != null) "النتيجة: ${PlateParser.display(best.letters, best.digits)}   (ثقة ${best.conf}%)"
-                else "النتيجة: مفيش قراءة مقبولة",
+                if (best != null) tr(R.string.str_0180, PlateParser.display(best.letters, best.digits), best.conf)
+                else tr(R.string.str_0181),
                 fontWeight = FontWeight.Bold,
                 color = if (best != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
             )
-            Text("الزمن: ${d.ms} ms", style = MaterialTheme.typography.bodySmall)
+            Text(tr(R.string.str_0182, d.ms), style = MaterialTheme.typography.bodySmall)
             d.attempts.forEach { a ->
                 Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(a.name, fontWeight = FontWeight.Bold)
@@ -145,10 +145,10 @@ fun PlateTestCard(vm: MainViewModel) {
                         a.used?.let { Image(it.asImageBitmap(), null, Modifier.weight(1f).heightIn(max = 120.dp), contentScale = ContentScale.Fit) }
                         Image(a.prepared.asImageBitmap(), null, Modifier.weight(1f).heightIn(max = 120.dp), contentScale = ContentScale.Fit)
                     }
-                    Text("النص الخام: \u200E" + (a.raw.ifBlank { "(فاضي)" }).replace('\n', ' ') + "   |   ثقة ${a.conf}%")
+                    Text(tr(R.string.str_0183) + (a.raw.ifBlank { tr(R.string.str_0184) }).replace('\n', ' ') + tr(R.string.str_0185, a.conf))
                     Text(
-                        a.hit?.let { "اتقبلت: " + PlateParser.display(it.letters, it.digits) }
-                            ?: "اترفضت (ثقة أقل من 35 أو الشكل مش شكل لوحة: 1-3 حروف و1-4 أرقام)",
+                        a.hit?.let { tr(R.string.str_0186) + PlateParser.display(it.letters, it.digits) }
+                            ?: tr(R.string.str_0187),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (a.hit != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )

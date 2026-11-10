@@ -56,6 +56,24 @@ data class AppSettings(
     val sourceMode: Int = 0,              // 0 = كاميرا الموبايل ، 1 = كاميرا على الشبكة (MJPEG عبر HTTP)
     val streamUrl: String = "",
     // ---- ثبات الكاميرا ----
+    // ---- جمع بيانات التدريب ----
+    val collectOn: Boolean = false,
+    val collectMode: Int = 1,              // 0 = كل العينات، 1 = الكشف غير المؤكد بس (الأنفع)
+    val collectEverySec: Int = 5,          // لقطة كل كام ثانية على الأكتر
+    val collectMax: Int = 300,             // نوقف بعد كام صورة
+    // ---- منطقة الكشف (قص الصورة قبل الموديل لتكبير العربيات البعيدة) ----
+    val roiAuto: Boolean = true,           // قص تلقائي حوالين الخطين A وB
+    val zoneL: Float = 0f,                 // حدود يدوية (نسبة من الصورة) بتتقاطع مع التلقائي
+    val zoneT: Float = 0f,
+    val zoneR: Float = 1f,
+    val zoneB: Float = 1f,
+    // ---- جودة الصورة ----
+    val stabOff: Boolean = true,           // قفل تثبيت الفيديو (EIS/OIS): بيلوي الفريمات ويزحزح التوقيت
+    val focusLock: Boolean = true,         // تثبيت الفوكس بعد الضبط: بيمنع تخبّط الفوكس لما عربية تعدّي
+    val ispDistortion: Boolean = false,    // يطلب من الكاميرا تصحيح تشويه العدسة بأعلى جودة (لو الجهاز بيدعم)
+    val zoom: Float = 1f,                  // زووم الكاميرا (يتظبط قبل المعايرة)
+    val fullHd: Boolean = false,           // 1080p: لوحات أوضح، لكن أتقل على الجهاز
+    val plateFormat: String = "auto",      // صيغة لوحات البلد: auto | eg | latin | uk | fr | de | es | it
     val movedGuard: Boolean = true        // إنذار لو الكاميرا اتحركت عن المرجع المحفوظ، وتخفيض ثقة القياسات وقتها
 )
 
@@ -108,7 +126,20 @@ class SettingsStore(ctx: Context) {
             siteLon = p.getString("siteLon", d.siteLon) ?: "",
             sourceMode = p.getInt("sourceMode", d.sourceMode),
             streamUrl = p.getString("streamUrl", d.streamUrl) ?: "",
-            movedGuard = p.getBoolean("movedGuard", d.movedGuard)
+            movedGuard = p.getBoolean("movedGuard", d.movedGuard),
+            plateFormat = p.getString("plateFormat", d.plateFormat) ?: "auto",
+            collectOn = p.getBoolean("collectOn", d.collectOn),
+            collectMode = p.getInt("collectMode", d.collectMode),
+            collectEverySec = p.getInt("collectEverySec", d.collectEverySec),
+            collectMax = p.getInt("collectMax", d.collectMax),
+            roiAuto = p.getBoolean("roiAuto", d.roiAuto),
+            zoneL = p.getFloat("zoneL", d.zoneL), zoneT = p.getFloat("zoneT", d.zoneT),
+            zoneR = p.getFloat("zoneR", d.zoneR), zoneB = p.getFloat("zoneB", d.zoneB),
+            stabOff = p.getBoolean("stabOff", d.stabOff),
+            focusLock = p.getBoolean("focusLock", d.focusLock),
+            zoom = p.getFloat("zoom", d.zoom),
+            ispDistortion = p.getBoolean("ispDistortion", d.ispDistortion),
+            fullHd = p.getBoolean("fullHd", d.fullHd)
         )
     }
 
@@ -154,6 +185,18 @@ class SettingsStore(ctx: Context) {
             .putInt("sourceMode", s.sourceMode)
             .putString("streamUrl", s.streamUrl)
             .putBoolean("movedGuard", s.movedGuard)
+            .putString("plateFormat", s.plateFormat)
+            .putBoolean("collectOn", s.collectOn)
+            .putInt("collectMode", s.collectMode)
+            .putInt("collectEverySec", s.collectEverySec)
+            .putInt("collectMax", s.collectMax)
+            .putBoolean("roiAuto", s.roiAuto)
+            .putFloat("zoneL", s.zoneL).putFloat("zoneT", s.zoneT).putFloat("zoneR", s.zoneR).putFloat("zoneB", s.zoneB)
+            .putBoolean("stabOff", s.stabOff)
+            .putBoolean("focusLock", s.focusLock)
+            .putFloat("zoom", s.zoom)
+            .putBoolean("ispDistortion", s.ispDistortion)
+            .putBoolean("fullHd", s.fullHd)
             .apply()
     }
 }

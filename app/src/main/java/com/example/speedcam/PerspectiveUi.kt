@@ -154,7 +154,7 @@ fun PerspectivePanel(
     editorHint: Boolean = true
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        PerspSwitchRow("استخدام تحويل المنظور (يلغي فرق السرعة بين الحارات)", s.homoOn) { on ->
+        PerspSwitchRow(tr(R.string.str_0130), s.homoOn) { on ->
             update {
                 it.copy(
                     homoOn = on,
@@ -164,49 +164,49 @@ fun PerspectivePanel(
         }
         Text(
             if (editorHint)
-                "1) علّم على الطريق 4 علامات (مثلاً 4 قمع) على أركان مستطيل: خطين متوازيين عرض الطريق كله.\n" +
-                    "2) قس المسافة بين الخطين على طول الطريق واكتبها تحت.\n" +
-                    "3) اسحب النقط 1 و2 على الخط الأول (A) والنقط 4 و3 على الخط التاني (B)، كل نقطة قصاد اللي بعدها."
+                tr(R.string.str_0131) +
+                    tr(R.string.str_0132) +
+                    tr(R.string.str_0133)
             else
-                "ضبط النقط من تبويب الكاميرا ← زرار \"المنظور\".",
+                tr(R.string.str_0134),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        var txt by remember { mutableStateOf(String.format(Locale.US, "%.1f", s.distanceM)) }
+        var txt by remember { mutableStateOf(Units.field(Units.dist(s.distanceM))) }
         OutlinedTextField(
             value = txt,
             onValueChange = { v ->
                 txt = v
-                v.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }?.let { d -> update { it.copy(distanceM = d) } }
+                v.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }?.let { d -> update { it.copy(distanceM = Units.toMeters(d).toFloat()) } }
             },
-            label = { Text("المسافة الحقيقية بين الخطين A و B على طول الطريق (متر)") },
+            label = { Text(tr(R.string.str_0135)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
         if (s.homoOn && Geo.invalid(s)) {
             Text(
-                "⚠ النقط مش مكوّنة شكل رباعي صالح (لازم محدّب وغير منبعج). عدّلها، ولحد ما تتظبط التطبيق بيستخدم الخطين العاديين.",
+                tr(R.string.str_0136),
                 color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall
             )
         } else if (s.homoOn) {
             Text(
-                "✓ تحويل المنظور شغال. السرعة بتتحسب على الأرض من الخط A للخط B، فالحارة القريبة والبعيدة بيطلعوا بنفس الدقة.",
+                tr(R.string.str_0137),
                 color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall
             )
         }
-        Text("تصحيح تشوه العدسة (k1): " + String.format(Locale.US, "%.2f", s.lensK1), fontWeight = FontWeight.Bold)
+        Text(tr(R.string.str_0138) + String.format(Locale.US, "%.2f", s.lensK1), fontWeight = FontWeight.Bold)
         Slider(
             value = s.lensK1,
             onValueChange = { v -> update { it.copy(lensK1 = (Math.round(v * 100f) / 100f)) } },
             valueRange = -0.30f..0.30f
         )
         Text(
-            "سيبه على 0 لو مش متأكد. التشوه بيأثر على الأطراف، فالأسهل إن الخطين A وB يبقوا في الثلثين الأوسطين من الصورة. " +
-                "لو قيست دقة أحسن بقيمة معينة في المعايرة بعربية معروفة السرعة، استخدمها.",
+            tr(R.string.str_0139) +
+                tr(R.string.str_0140),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { update { it.copy(homoPts = Geo.encodePts(Geo.defaultPts())) } }) { BtnText("إعادة النقط") }
+            OutlinedButton(onClick = { update { it.copy(homoPts = Geo.encodePts(Geo.defaultPts())) } }) { BtnText(tr(R.string.str_0141)) }
         }
     }
 }

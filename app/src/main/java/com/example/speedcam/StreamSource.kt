@@ -46,7 +46,7 @@ class StreamSource(
         while (!stopped) {
             var gotFrames = false
             try {
-                onStatus("جاري الاتصال...")
+                onStatus(tr(R.string.str_0361))
                 val u = URL(url)
                 val c = u.openConnection() as HttpURLConnection
                 conn = c
@@ -55,7 +55,7 @@ class StreamSource(
                 u.userInfo?.let { c.setRequestProperty("Authorization", "Basic " + Base64.encodeToString(it.toByteArray(), Base64.NO_WRAP)) }
                 c.connect()
                 if (c.responseCode != 200) throw IOException("HTTP ${c.responseCode}")
-                onStatus("متصل")
+                onStatus(tr(R.string.str_0362))
                 val input = BufferedInputStream(c.inputStream, 1 shl 16)
                 val buf = ByteArray(MAX_BUF)
                 var len = 0
@@ -87,7 +87,7 @@ class StreamSource(
             } catch (e: Throwable) {
                 if (stopped) return
                 Log.w(TAG, "stream error", e)
-                onStatus("انقطع الاتصال (${e.message ?: e.javaClass.simpleName})، إعادة المحاولة...")
+                onStatus(tr(R.string.str_0363, e.message ?: e.javaClass.simpleName))
             }
             if (stopped) return
             try { Thread.sleep(if (gotFrames) 50L else 2000L) } catch (_: InterruptedException) { return }

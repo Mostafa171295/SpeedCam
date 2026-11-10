@@ -1,8 +1,11 @@
 package com.example.speedcam
 
-enum class VehicleType(val ar: String, val color: Long) {
-    CAR("ملاكي", 0xFF2979FF), MICROBUS("ميكروباص", 0xFF00BFA5), TUKTUK("توك توك", 0xFFF59E0B),
-    MOTORCYCLE("دراجة نارية", 0xFFAB47BC), BUS("أتوبيس", 0xFFF4511E), TRUCK("نقل", 0xFF6D4C41);
+enum class VehicleType(private val nameRes: Int, val color: Long) {
+    CAR(R.string.vt_car, 0xFF2979FF), MICROBUS(R.string.vt_microbus, 0xFF00BFA5), TUKTUK(R.string.vt_tuktuk, 0xFFF59E0B),
+    MOTORCYCLE(R.string.vt_motorcycle, 0xFFAB47BC), BUS(R.string.vt_bus, 0xFFF4511E), TRUCK(R.string.vt_truck, 0xFF6D4C41);
+
+    /** الاسم المعروض بلغة التطبيق الحالية (بيتقرأ وقت الاستخدام عشان تغيير اللغة يشتغل فوراً). */
+    val ar: String get() = tr(nameRes)
 
     companion object {
         /** يدعم أسماء COCO الجاهزة وأسماء الموديل المخصص. */
@@ -56,6 +59,6 @@ data class Overlay(
 )
 
 fun directionLabel(direction: Int, axisHorizontal: Boolean): String =
-    if (DirectionMode.homo) { if (direction == 1) "من A إلى B" else "من B إلى A" }
-    else if (axisHorizontal) { if (direction == 1) "لليمين →" else "← لليسار" }
-    else { if (direction == 1) "ناحية الكاميرا ↓" else "بعيداً عن الكاميرا ↑" }
+    if (DirectionMode.homo) { if (direction == 1) tr(R.string.dir_a_to_b) else tr(R.string.dir_b_to_a) }
+    else if (axisHorizontal) { if (direction == 1) tr(R.string.dir_right) else tr(R.string.dir_left) }
+    else { if (direction == 1) tr(R.string.dir_toward) else tr(R.string.dir_away) }

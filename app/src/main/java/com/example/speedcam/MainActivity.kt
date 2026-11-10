@@ -1,5 +1,6 @@
 package com.example.speedcam
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -37,11 +38,16 @@ class MainActivity : ComponentActivity() {
         Core.get(this).host.setActivityVisible(false)
     }
 
+    // اللغة المختارة (ومعها اتجاه الشاشة) بتتطبق هنا على الـ Activity كلها
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLang.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             SpeedCamTheme {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                CompositionLocalProvider(LocalLayoutDirection provides if (AppLang.isRtl()) LayoutDirection.Rtl else LayoutDirection.Ltr) {
                     AppRoot(vm)
                 }
             }
@@ -56,11 +62,11 @@ fun AppRoot(vm: MainViewModel) {
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Filled.Videocam, null) }, label = { Text("الكاميرا") })
-                NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Filled.Speed, null) }, label = { Text("المركبات") })
-                NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Filled.CreditCard, null) }, label = { Text("اللوحات") })
-                NavigationBarItem(tab == 3, { tab = 3 }, { Icon(Icons.Filled.BarChart, null) }, label = { Text("الإحصائيات") })
-                NavigationBarItem(tab == 4, { tab = 4 }, { Icon(Icons.Filled.Settings, null) }, label = { Text("الإعدادات") })
+                NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Filled.Videocam, null) }, label = { Text(tr(R.string.str_0125)) })
+                NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Filled.Speed, null) }, label = { Text(tr(R.string.str_0126)) })
+                NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Filled.CreditCard, null) }, label = { Text(tr(R.string.str_0127)) })
+                NavigationBarItem(tab == 3, { tab = 3 }, { Icon(Icons.Filled.BarChart, null) }, label = { Text(tr(R.string.str_0128)) })
+                NavigationBarItem(tab == 4, { tab = 4 }, { Icon(Icons.Filled.Settings, null) }, label = { Text(tr(R.string.str_0129)) })
             }
         }
     ) { pad ->

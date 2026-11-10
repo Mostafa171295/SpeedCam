@@ -26,55 +26,55 @@ fun TrafficMetricsCard(list: List<SpeedRecord>, s: AppSettings) {
     val metrics = remember(list, s.laneCount, s.laneCapacity) { TrafficMetrics.compute(list, s.laneCount, s.laneCapacity) }
     val lanes = remember(list, s.dropOutliers) { TrafficMetrics.laneStats(list, s.dropOutliers) }
     AppCard {
-        SectionTitle(Icons.Filled.BarChart, "مؤشرات هندسة المرور")
+        SectionTitle(Icons.Filled.BarChart, tr(R.string.str_0364))
         if (metrics.isEmpty()) {
-            Text("مفيش قياسات في الفترة دي.", style = MaterialTheme.typography.bodySmall)
+            Text(tr(R.string.str_0365), style = MaterialTheme.typography.bodySmall)
         }
         metrics.forEach { m ->
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(directionLabel(m.dir, s.axisHorizontal) + "  —  ${m.count} مركبة", fontWeight = FontWeight.Bold)
-                Text("التدفق المتوسط: ${m.flowVehH.toInt()} مركبة/س  (${m.flowPcuH.toInt()} PCE/س)", style = MaterialTheme.typography.bodyMedium)
+                Text(directionLabel(m.dir, s.axisHorizontal) + tr(R.string.str_0366, m.count), fontWeight = FontWeight.Bold)
+                Text(tr(R.string.str_0367, m.flowVehH.toInt(), m.flowPcuH.toInt()), style = MaterialTheme.typography.bodyMedium)
                 if (m.peak15RatePcuH != null) {
-                    Text("أعلى 15 دقيقة (×4): ${m.peak15RatePcuH.toInt()} PCE/س", style = MaterialTheme.typography.bodyMedium)
+                    Text(tr(R.string.str_0368, m.peak15RatePcuH.toInt()), style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    Text("أعلى 15 دقيقة: محتاج 15 دقيقة قياس على الأقل.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr(R.string.str_0369), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(
-                    if (m.phf != null) "معامل ساعة الذروة PHF: ${String.format(Locale.US, "%.2f", m.phf)}" else "معامل ساعة الذروة: محتاج ساعة قياس على الأقل.",
+                    if (m.phf != null) tr(R.string.str_0370, String.format(Locale.US, "%.2f", m.phf)) else tr(R.string.str_0371),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 if (m.vc != null && m.los != null) {
                     Text(
-                        "التدفق ÷ السعة = ${String.format(Locale.US, "%.2f", m.vc)}  →  مستوى الخدمة ${m.los}",
+                        tr(R.string.str_0372, String.format(Locale.US, "%.2f", m.vc), m.los),
                         fontWeight = FontWeight.Bold,
                         color = if (m.vc > 0.93) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
                 }
                 if (m.meanHeadway != null && m.medianHeadway != null && m.shortHeadwayPct != null) {
                     Text(
-                        "الفجوة الزمنية بين المركبات: متوسط ${f1(m.meanHeadway)} ث • وسيط ${f1(m.medianHeadway)} ث • ${m.shortHeadwayPct.toInt()}% أقل من ثانيتين",
+                        tr(R.string.str_0373, f1(m.meanHeadway), f1(m.medianHeadway), m.shortHeadwayPct.toInt()),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
         }
         if (lanes.isNotEmpty()) {
-            Text("لكل حارة", fontWeight = FontWeight.Bold)
+            Text(tr(R.string.str_0374), fontWeight = FontWeight.Bold)
             lanes.forEach { l ->
                 Text(
-                    "حارة ${l.lane}: ${l.count} مركبة" +
-                        (if (l.meanKmh != null) " • متوسط ${l.meanKmh.toInt()} كم/س" else "") +
-                        (if (l.v85 != null) " • V85 ${l.v85.toInt()}" else ""),
+                    tr(R.string.str_0375, l.lane, l.count) +
+                        (if (l.meanKmh != null) tr(R.string.str_0376, Units.spdI(l.meanKmh)) else "") +
+                        (if (l.v85 != null) " • V85 ${Units.spdI(l.v85)}" else ""),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
         } else if (metrics.isNotEmpty()) {
-            Text("إحصاء الحارات بيظهر لما تفعّل تحويل المنظور.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr(R.string.str_0377), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(
-            "ملاحظات: PCE بقيم استرشادية (ملاكي 1، ميكروباص 1.5، توك توك 0.8، موتوسيكل 0.4، أتوبيس ونقل 2). " +
-                "مستوى الخدمة تقدير مبدئي بنسبة التدفق للسعة بحدود شائعة، ومش بديل لحساب HCM الكامل. " +
-                "الحارات متساوية العرض بين جنبي الطريق المعلّم، والتدفق على فترة القياس الفعلية (لو القياس اتوقف بيقل).",
+            tr(R.string.str_0378) +
+                tr(R.string.str_0379) +
+                tr(R.string.str_0380),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -85,10 +85,10 @@ fun TrafficMetricsCard(list: List<SpeedRecord>, s: AppSettings) {
 fun AnomalyCard(items: List<AnomalyRecord>, onClear: () -> Unit) {
     val fmt = remember { SimpleDateFormat("MM/dd HH:mm:ss", Locale.getDefault()) }
     AppCard {
-        SectionTitle(Icons.Filled.Warning, "حالات غير عادية (${items.size})")
+        SectionTitle(Icons.Filled.Warning, tr(R.string.str_0381, items.size))
         if (items.isEmpty()) {
             Text(
-                "مفيش حالات متسجلة. فعّل التنبيهات من الإعدادات (عكس الاتجاه، مركبة واقفة، ازدحام، سرعة عالية جداً).",
+                tr(R.string.str_0382),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
@@ -101,8 +101,8 @@ fun AnomalyCard(items: List<AnomalyRecord>, onClear: () -> Unit) {
                     }
                 }
             }
-            if (items.size > 30) Text("(معروض آخر 30 حالة)", style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = onClear) { BtnText("مسح السجل") }
+            if (items.size > 30) Text(tr(R.string.str_0383), style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = onClear) { BtnText(tr(R.string.str_0384)) }
         }
     }
 }

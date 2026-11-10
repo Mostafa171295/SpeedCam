@@ -35,6 +35,7 @@ fun CalibrationWizard(
 ) {
     var step by rememberSaveable { mutableStateOf(0) }
     val st by vm.engine.stability.state.collectAsStateWithLifecycle()
+    val iq by vm.engine.quality.state.collectAsStateWithLifecycle()
 
     // المراقبة اللحظية للثبات شغالة طول ما الويزارد مفتوح (حتى والقياس واقف)
     DisposableEffect(Unit) {
@@ -47,17 +48,17 @@ fun CalibrationWizard(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "معايرة موجّهة — الخطوة ${step + 1} من $STEPS: " + stepTitle(step),
+                tr(R.string.str_0001, step + 1, STEPS) + stepTitle(step),
                 fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
             )
-            TextButton(onClick = onClose) { BtnText("إغلاق") }
+            TextButton(onClick = onClose) { BtnText(tr(R.string.str_0002)) }
         }
         Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
             Box(Modifier.fillMaxWidth((step + 1) / STEPS.toFloat()).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
         }
 
         when (step) {
-            0 -> StepMount(st)
+            0 -> StepMount(st, iq)
             1 -> CalibrationControls(s, vm::update, fps)
             2 -> StepPerspective(vm, s)
             3 -> StepSamples(vm, s)
@@ -68,24 +69,24 @@ fun CalibrationWizard(
             OutlinedButton(
                 enabled = step > 0, onClick = { step-- },
                 modifier = Modifier.weight(1f), contentPadding = BtnPadding
-            ) { BtnText("السابق") }
+            ) { BtnText(tr(R.string.str_0003)) }
             if (step < STEPS - 1) {
                 Button(onClick = { step++ }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) {
-                    BtnText(if (step == 2 && !s.homoOn) "تخطي" else "التالي")
+                    BtnText(if (step == 2 && !s.homoOn) tr(R.string.str_0004) else tr(R.string.str_0005))
                 }
             } else {
-                Button(onClick = onClose, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { BtnText("تم") }
+                Button(onClick = onClose, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { BtnText(tr(R.string.str_0006)) }
             }
         }
     }
 }
 
 private fun stepTitle(i: Int) = when (i) {
-    0 -> "تثبيت الموبايل"
-    1 -> "الاتجاه والخطين والمسافة"
-    2 -> "المنظور (اختياري)"
-    3 -> "عينات السرعة"
-    else -> "المرجع والملخص"
+    0 -> tr(R.string.str_0007)
+    1 -> tr(R.string.str_0008)
+    2 -> tr(R.string.str_0009)
+    3 -> tr(R.string.str_0010)
+    else -> tr(R.string.str_0011)
 }
 
 @Composable
@@ -94,19 +95,20 @@ private fun Hint(text: String) {
 }
 
 @Composable
-private fun StepMount(st: CamStability) {
+private fun StepMount(st: CamStability, iq: ImgQuality) {
     Hint(
-        "ثبّت الموبايل على حامل ثابت، ومن مكان مرتفع شوية وبزاوية مايلة على الطريق، وما تحركوش بعد المعايرة خالص. " +
-            "أي تحريك بعد كده بيبوّظ المسافة بين الخطين وبالتالي السرعة."
+        tr(R.string.str_0012) +
+            tr(R.string.str_0013)
     )
-    if (st.hasRef) StabilityBadge(st) else Hint("لسه مفيش مرجع محفوظ للثبات، هتحفظه في آخر خطوة.")
+    if (st.hasRef) StabilityBadge(st) else Hint(tr(R.string.str_0014))
+    ImageQualityBadge(iq)
 }
 
 @Composable
 private fun StepPerspective(vm: MainViewModel, s: AppSettings) {
     Hint(
-        "لو الكاميرا بتصوّر الطريق بزاوية مايلة، تحويل المنظور بيدّي سرعة أدق ويفرّق الحارات. " +
-            "لو الكاميرا من فوق الطريق مباشرة أو هتقيس حارة واحدة، اضغط \"تخطي\"."
+        tr(R.string.str_0015) +
+            tr(R.string.str_0016)
     )
     PerspectivePanel(s, vm::update)
 }
@@ -115,11 +117,12 @@ private fun StepPerspective(vm: MainViewModel, s: AppSettings) {
 private fun StepSamples(vm: MainViewModel, s: AppSettings) {
     var gps by rememberSaveable { mutableStateOf(false) }
     Hint(
-        "ابدأ القياس بزرار \"بدء\" تحت، واعبر بعربية سرعتها معروفة. محتاج 3 عينات على الأقل بسرعات مختلفة. " +
-            "تقدر تتخطى الخطوة دي وتعتمد على الحساب النظري، بس الدقة هتبقى أقل."
+        tr(R.string.str_0017) +
+            tr(R.string.str_0018)
     )
     SpeedCalibrationBox(s, vm::update)
-    FilterChip(gps, { gps = !gps }, { Text("معايرة تلقائية بالـ GPS") })
+    AccuracyTestBox(vm, s)
+    FilterChip(gps, { gps = !gps }, { Text(tr(R.string.str_0019)) })
     if (gps) GpsCalibCard(vm, s)
 }
 
@@ -128,33 +131,35 @@ private fun StepSummary(vm: MainViewModel, s: AppSettings, st: CamStability) {
     val samples = remember(s.calSamples) { Calibration.parse(s.calSamples) }
     val stats = remember(samples) { Calibration.stats(samples) }
     val linesOk = Geo.active(s) || abs(s.lineA - s.lineB) >= 0.15f
-    val dist = String.format(Locale.US, "%.1f", s.distanceM)
+    val dist = String.format(Locale.US, "%.1f", Units.dist(s.distanceM))
 
-    Check(linesOk, if (Geo.active(s)) "المنظور شغال، المسافة بين الخطين $dist م" else "الخطان متباعدان، المسافة $dist م",
-        "الخطان قريبان جداً: باعد بينهما (الخطوة 2)")
+    Check(linesOk, if (Geo.active(s)) tr(R.string.str_0020, dist) else tr(R.string.str_0021, dist),
+        tr(R.string.str_0022))
     Check(
         samples.size >= 3,
-        "عينات المعايرة: ${samples.size}" + (stats?.let { " (±" + String.format(Locale.US, "%.1f", it.half95) + " كم/س)" } ?: ""),
-        if (samples.isEmpty()) "مفيش عينات سرعة، الدقة نظرية بس (الخطوة 4)" else "عينات قليلة (${samples.size})، ضيف لحد 3 على الأقل (الخطوة 4)"
+        tr(R.string.str_0023, samples.size) + (stats?.let { " (±" + String.format(Locale.US, "%.1f", Units.spd(it.half95)) + tr(R.string.str_0024) } ?: ""),
+        if (samples.isEmpty()) tr(R.string.str_0025) else tr(R.string.str_0026, samples.size)
     )
-    Check(st.hasRef, "مرجع الثبات محفوظ", "لسه ما حفظتش مرجع الثبات، اضغط الزرار تحت")
+    Check(st.hasRef, tr(R.string.str_0027), tr(R.string.str_0028))
+    val sc by vm.engine.scaleCheck.state.collectAsStateWithLifecycle()
+    ScaleCheckBadge(sc)
     if (st.hasRef) StabilityBadge(st)
 
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = { vm.engine.stability.captureReference() },
             modifier = Modifier.weight(1f), contentPadding = BtnPadding
-        ) { BtnText(if (st.hasRef) "حدّث المرجع" else "احفظ المرجع الآن") }
+        ) { BtnText(if (st.hasRef) tr(R.string.str_0029) else tr(R.string.str_0030)) }
         if (st.hasRef) OutlinedButton(
             onClick = { vm.engine.stability.clearReference() },
             modifier = Modifier.weight(1f), contentPadding = BtnPadding
-        ) { BtnText("امسح المرجع") }
+        ) { BtnText(tr(R.string.str_0031)) }
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("نبّهني لو الكاميرا اتحركت", Modifier.weight(1f))
+        Text(tr(R.string.str_0032), Modifier.weight(1f))
         Switch(s.movedGuard, { v -> vm.update { it.copy(movedGuard = v) } })
     }
-    Hint("احفظ المرجع بعد ما تخلّص المعايرة وهي على الوضع النهائي، وبدون عربيات كتير في الكادر لو أمكن.")
+    Hint(tr(R.string.str_0033))
 }
 
 @Composable
@@ -175,11 +180,11 @@ fun StabilityBadge(st: CamStability, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
-            "ثبات الكاميرا: ${st.score}%  •  " + when (st.level) { 0 -> "ثابتة"; 1 -> "اهتزاز/إزاحة بسيطة"; else -> "اتحركت" },
+            tr(R.string.str_0034, st.score) + when (st.level) { 0 -> tr(R.string.str_0035); 1 -> tr(R.string.str_0036); else -> tr(R.string.str_0037) },
             color = c, fontWeight = FontWeight.Bold
         )
         Text(
-            "إزاحة عن المرجع " + String.format(Locale.US, "%.1f", st.shiftPct) + "%  •  اهتزاز " + String.format(Locale.US, "%.2f", st.jitterPct) + "%",
+            tr(R.string.str_0038) + String.format(Locale.US, "%.1f", st.shiftPct) + tr(R.string.str_0039) + String.format(Locale.US, "%.2f", st.jitterPct) + "%",
             style = MaterialTheme.typography.bodySmall
         )
         if (st.message.isNotEmpty()) Text(st.message, style = MaterialTheme.typography.bodySmall)

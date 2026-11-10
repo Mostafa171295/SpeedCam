@@ -50,10 +50,13 @@ private fun statusOf(r: SpeedRecord, limit: Float): Int {
     return if (r.speedKmh - r.speedErr > limit) 2 else 1
 }
 private const val MIN_RELIABLE = 70   // أقل ثقة نعتبرها "موثوقة" في فلتر القراءات الموثوقة
-private val QUICK_LIMITS = listOf(40, 60, 80, 100, 120)
+// حدود سريعة بالوحدة المعروضة (كم/س أو ميل/س)
+private fun quickLimits(): List<Int> = if (Units.imperial) listOf(25, 40, 50, 60, 75) else listOf(40, 60, 80, 100, 120)
 
-private fun limitText(v: Float): String =
-    if (v % 1f == 0f) v.toInt().toString() else String.format(Locale.US, "%.1f", v)
+private fun limitText(v: Float): String {
+    val d = Units.spd(v)
+    return if (kotlin.math.abs(d - d.toInt()) < 0.05) d.toInt().toString() else String.format(Locale.US, "%.1f", d)
+}
 
 /**
  * تبويب "المركبات": كل مركبة ظهرت في الكاميرا وتم تسجيلها.
@@ -101,36 +104,36 @@ fun VehiclesScreen(vm: MainViewModel) {
         val n = if (all2) allRecords.size else list.size
         AlertDialog(
             onDismissRequest = { confirm = 0 },
-            title = { Text(if (all2) "حذف كل المركبات؟" else "حذف المركبات المعروضة؟") },
+            title = { Text(if (all2) tr(R.string.str_0385) else tr(R.string.str_0386)) },
             text = {
                 Text(
-                    "هيتم حذف $n مركبة" + (if (all2) " (كل المسجّل)" else " (حسب الفلتر الحالي)") +
-                        " ومعاها لقطات الإثبات بتاعتها، ولا يمكن التراجع. لو عايز نسخة، صدّر Excel الأول."
+                    tr(R.string.str_0387, n) + (if (all2) tr(R.string.str_0388) else tr(R.string.str_0389)) +
+                        tr(R.string.str_0390)
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     if (all2) vm.clearAll() else vm.deleteMany(list)
                     confirm = 0
-                }) { BtnText("حذف") }
+                }) { BtnText(tr(R.string.str_0163)) }
             },
-            dismissButton = { TextButton(onClick = { confirm = 0 }) { BtnText("إلغاء") } }
+            dismissButton = { TextButton(onClick = { confirm = 0 }) { BtnText(tr(R.string.str_0167)) } }
         )
     }
     delOne?.let { r ->
         AlertDialog(
             onDismissRequest = { delOne = null },
-            title = { Text("حذف المركبة دي؟") },
-            text = { Text("هيتم حذف المركبة المسجلة في ${fmt.format(Date(r.timestamp))} ومعاها لقطة الإثبات (لو فيه).") },
+            title = { Text(tr(R.string.str_0391)) },
+            text = { Text(tr(R.string.str_0392, fmt.format(Date(r.timestamp)))) },
             confirmButton = {
-                TextButton(onClick = { vm.delete(r); delOne = null }) { BtnText("حذف") }
+                TextButton(onClick = { vm.delete(r); delOne = null }) { BtnText(tr(R.string.str_0163)) }
             },
-            dismissButton = { TextButton(onClick = { delOne = null }) { BtnText("إلغاء") } }
+            dismissButton = { TextButton(onClick = { delOne = null }) { BtnText(tr(R.string.str_0167)) } }
         )
     }
 
     Column(Modifier.fillMaxSize()) {
-        AppHeader("المركبات", "كل المركبات اللي ظهرت في الكاميرا، والمتجاوزة للسرعة بالأحمر")
+        AppHeader(tr(R.string.str_0126), tr(R.string.str_0393))
         LazyColumn(
             Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -138,24 +141,24 @@ fun VehiclesScreen(vm: MainViewModel) {
             // ---------- حد السرعة ----------
             item {
                 AppCard {
-                    SectionTitle(Icons.Filled.Speed, "حد السرعة")
+                    SectionTitle(Icons.Filled.Speed, tr(R.string.str_0394))
                     OutlinedTextField(
                         value = limitTxt,
                         onValueChange = { v ->
                             limitTxt = v
                             v.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
-                                ?.let { n -> vm.update { it.copy(speedLimit = n) } }
+                                ?.let { n -> vm.update { it.copy(speedLimit = Units.toKmh(n).toFloat()) } }
                         },
-                        label = { Text("أي مركبة أسرع من (كم/س) تظهر بالأحمر") },
+                        label = { Text(tr(R.string.str_0395)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        QUICK_LIMITS.forEach { v ->
+                        quickLimits().forEach { v ->
                             FilterChip(
-                                selected = limit == v.toFloat(),
-                                onClick = { limitTxt = v.toString(); vm.update { it.copy(speedLimit = v.toFloat()) } },
+                                selected = kotlin.math.abs(limit - Units.toKmh(v).toFloat()) < 0.5f,
+                                onClick = { limitTxt = v.toString(); vm.update { it.copy(speedLimit = Units.toKmh(v).toFloat()) } },
                                 label = { Text("$v") },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = red.copy(alpha = 0.15f), selectedLabelColor = red
@@ -165,9 +168,9 @@ fun VehiclesScreen(vm: MainViewModel) {
                     }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("قراءات موثوقة فقط", fontWeight = FontWeight.Bold)
+                            Text(tr(R.string.str_0396), fontWeight = FontWeight.Bold)
                             Text(
-                                "يستبعد القراءات اللي ثقتها أقل من $MIN_RELIABLE% (التتبع كان ضعيف أو المربع بيتهز).",
+                                tr(R.string.str_0397, MIN_RELIABLE),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -175,22 +178,22 @@ fun VehiclesScreen(vm: MainViewModel) {
                     }
                     // توزيع جودة القياسات: عالية / متوسطة / ضعيفة (الضعيفة غالباً تتبع ضعيف أو الكاميرا اتحركت)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        QualityTile(Modifier.weight(1f), "عالية", qHigh, Color(0xFF2E7D32))
-                        QualityTile(Modifier.weight(1f), "متوسطة", qMid, AMBER)
-                        QualityTile(Modifier.weight(1f), "ضعيفة", qLow, MaterialTheme.colorScheme.onSurfaceVariant)
+                        QualityTile(Modifier.weight(1f), tr(R.string.str_0398), qHigh, Color(0xFF2E7D32))
+                        QualityTile(Modifier.weight(1f), tr(R.string.str_0399), qMid, AMBER)
+                        QualityTile(Modifier.weight(1f), tr(R.string.str_0400), qLow, MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    FilterChip(weakFirst, { weakFirst = !weakFirst }, { Text("الأضعف ثقة أولاً") })
+                    FilterChip(weakFirst, { weakFirst = !weakFirst }, { Text(tr(R.string.str_0401)) })
                 }
             }
 
             // ---------- ملخص ----------
             item {
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SummaryTile(Modifier.weight(1f).fillMaxHeight(), "إجمالي المركبات", "${all.size}", MaterialTheme.colorScheme.primary)
-                    SummaryTile(Modifier.weight(1f).fillMaxHeight(), "متجاوزة مؤكدة", "${confirmed.size}", red)
+                    SummaryTile(Modifier.weight(1f).fillMaxHeight(), tr(R.string.str_0402), "${all.size}", MaterialTheme.colorScheme.primary)
+                    SummaryTile(Modifier.weight(1f).fillMaxHeight(), tr(R.string.str_0403), "${confirmed.size}", red)
                     SummaryTile(
-                        Modifier.weight(1f).fillMaxHeight(), "أعلى سرعة",
-                        maxSpeed?.let { "${it.roundToInt()}" } ?: "—",
+                        Modifier.weight(1f).fillMaxHeight(), tr(R.string.str_0404),
+                        maxSpeed?.let { "${Units.spdI(it)}" } ?: "—",
                         if (maxSpeed != null && maxSpeed > limit) red else MaterialTheme.colorScheme.secondary
                     )
                 }
@@ -199,15 +202,15 @@ fun VehiclesScreen(vm: MainViewModel) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("نسبة المتجاوزين المؤكدين", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("${(rate * 100).roundToInt()}%  (${confirmed.size} من ${measured.size})", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (confirmed.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else red)
+                            Text(tr(R.string.str_0405), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr(R.string.str_0406, (rate * 100).roundToInt(), confirmed.size, measured.size), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (confirmed.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else red)
                         }
                         Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
                             if (rate > 0f) Box(Modifier.fillMaxWidth(rate.coerceIn(0.02f, 1f)).fillMaxHeight().background(red))
                         }
                         if (uncertainCount > 0) {
                             Text(
-                                "$uncertainCount قراءة فوق الحد لكن ضمن هامش الخطأ (غير مؤكدة)",
+                                tr(R.string.str_0407, uncertainCount),
                                 style = MaterialTheme.typography.bodySmall, color = AMBER
                             )
                         }
@@ -218,9 +221,9 @@ fun VehiclesScreen(vm: MainViewModel) {
             // ---------- فلتر + تصدير ----------
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    FilterChip(!onlyOver, { onlyOver = false }, { Text("كل المركبات (${all.size})") })
+                    FilterChip(!onlyOver, { onlyOver = false }, { Text(tr(R.string.str_0408, all.size)) })
                     FilterChip(
-                        onlyOver, { onlyOver = true }, { Text("المتجاوزة (${over.size})") },
+                        onlyOver, { onlyOver = true }, { Text(tr(R.string.str_0409, over.size)) },
                         leadingIcon = { Icon(Icons.Filled.Warning, null, Modifier.size(16.dp)) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = red.copy(alpha = 0.15f), selectedLabelColor = red, selectedLeadingIconColor = red
@@ -235,36 +238,36 @@ fun VehiclesScreen(vm: MainViewModel) {
                             val f = withContext(Dispatchers.IO) { CsvExporter.build(ctx, list, s.axisHorizontal) }
                             CsvExporter.share(ctx, f)
                         }
-                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("مشاركة Excel") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText(tr(R.string.str_0152)) }
                     OutlinedButton(enabled = list.isNotEmpty(), onClick = {
                         scope.launch {
                             val ok = withContext(Dispatchers.IO) {
                                 CsvExporter.saveToDownloads(ctx, CsvExporter.build(ctx, list, s.axisHorizontal))
                             }
-                            Toast.makeText(ctx, if (ok) "تم الحفظ في مجلد التنزيلات" else "فشل الحفظ", Toast.LENGTH_LONG).show()
+                            Toast.makeText(ctx, if (ok) tr(R.string.str_0153) else tr(R.string.str_0154), Toast.LENGTH_LONG).show()
                         }
-                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("حفظ بالتنزيلات") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText(tr(R.string.str_0155)) }
                 }
             }
 
             // ---------- حذف ----------
             item {
                 AppCard {
-                    SectionTitle(Icons.Filled.Delete, "حذف المركبات")
+                    SectionTitle(Icons.Filled.Delete, tr(R.string.str_0410))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             modifier = Modifier.weight(1f), contentPadding = BtnPadding,
                             enabled = list.isNotEmpty(), onClick = { confirm = 1 },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = red)
-                        ) { BtnText("حذف المعروض (${list.size})") }
+                        ) { BtnText(tr(R.string.str_0411, list.size)) }
                         Button(
                             modifier = Modifier.weight(1f), contentPadding = BtnPadding,
                             enabled = allRecords.isNotEmpty(), onClick = { confirm = 2 },
                             colors = ButtonDefaults.buttonColors(containerColor = red)
-                        ) { BtnText("حذف الكل (${allRecords.size})") }
+                        ) { BtnText(tr(R.string.str_0412, allRecords.size)) }
                     }
                     Text(
-                        "\"حذف المعروض\" بيمسح اللي ظاهر حسب الفلتر (المتجاوزين أو الموثوقة بس). وفيه زرار حذف على كل مركبة لوحدها.",
+                        tr(R.string.str_0413),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -279,11 +282,11 @@ fun VehiclesScreen(vm: MainViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                if (onlyOver) "لا توجد مركبات متجاوزة لـ ${limitText(limit)} كم/س" else "لا توجد مركبات مسجلة بعد",
+                                if (onlyOver) tr(R.string.str_0414, limitText(limit)) else tr(R.string.str_0415),
                                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold
                             )
                             Text(
-                                if (onlyOver) "غيّر حد السرعة أو اعرض كل المركبات." else "شغّل القياس من تبويب الكاميرا وهتظهر هنا كل مركبة معدّية.",
+                                if (onlyOver) tr(R.string.str_0416) else tr(R.string.str_0417),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -296,7 +299,7 @@ fun VehiclesScreen(vm: MainViewModel) {
                 if (list.size > MAX_ROWS) {
                     item {
                         Text(
-                            "معروض أحدث $MAX_ROWS من ${list.size} — التصدير يشمل الكل.",
+                            tr(R.string.str_0418, MAX_ROWS, list.size),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -351,18 +354,18 @@ private fun VehicleRow(r: SpeedRecord, limit: Float, fmt: SimpleDateFormat, onDe
                         Box(Modifier.size(9.dp).clip(CircleShape).background(Color(type?.color ?: 0xFF888888)))
                         Text(type?.ar ?: r.vehicleType, fontWeight = FontWeight.Bold)
                         if (flagged) {
-                            Icon(Icons.Filled.Warning, if (isOver) "تجاوز السرعة" else "تجاوز غير مؤكد", tint = flag, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.Warning, if (isOver) tr(R.string.str_0419) else tr(R.string.str_0420), tint = flag, modifier = Modifier.size(18.dp))
                         }
                     }
                     Text(
-                        if (r.plateDigits.isNotEmpty()) PlateParser.display(r.plateLetters, r.plateDigits) else "لوحة غير مقروءة",
+                        if (r.plateDigits.isNotEmpty()) PlateParser.display(r.plateLetters, r.plateDigits) else tr(R.string.str_0159),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (r.plateDigits.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         fmt.format(Date(r.timestamp)) + when {
-                            isOver -> "  •  أعلى من الحد بـ ${(r.speedKmh - limit).roundToInt()} كم/س"
-                            isUncertain -> "  •  فوق الحد لكن ضمن هامش الخطأ"
+                            isOver -> tr(R.string.str_0421, Units.spdI(r.speedKmh - limit))
+                            isUncertain -> tr(R.string.str_0422)
                             else -> ""
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -376,7 +379,7 @@ private fun VehicleRow(r: SpeedRecord, limit: Float, fmt: SimpleDateFormat, onDe
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(Icons.Filled.PhotoCamera, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                            Text("لقطة الإثبات", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            Text(tr(R.string.str_0423), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -387,18 +390,18 @@ private fun VehicleRow(r: SpeedRecord, limit: Float, fmt: SimpleDateFormat, onDe
                         contentColor = if (flagged) Color.White else MaterialTheme.colorScheme.onSurface
                     ) {
                         Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${r.speedKmh.roundToInt()}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text("${Units.spdI(r.speedKmh)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text(
-                                if (r.speedErr >= 0.5f) "± ${r.speedErr.roundToInt()} كم/س" else "كم/س",
+                                if (r.speedErr >= 0.5f) tr(R.string.str_0424, Units.spdI(r.speedErr)) else tr(R.string.str_0161),
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
                     }
                 } else {
-                    Text("عدّ فقط", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr(R.string.str_0162), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Filled.Delete, "حذف", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Filled.Delete, tr(R.string.str_0163), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -420,15 +423,15 @@ private fun QualityTile(modifier: Modifier, label: String, count: Int, color: Co
 @Composable
 private fun ConfidenceTag(conf: Int) {
     val (color, label) = when {
-        conf >= 75 -> Color(0xFF2E7D32) to "عالية"
-        conf >= MIN_RELIABLE -> Color(0xFF2E7D32) to "جيدة"
-        conf >= 50 -> Color(0xFFD98200) to "متوسطة"
-        else -> MaterialTheme.colorScheme.onSurfaceVariant to "ضعيفة"
+        conf >= 75 -> Color(0xFF2E7D32) to tr(R.string.str_0398)
+        conf >= MIN_RELIABLE -> Color(0xFF2E7D32) to tr(R.string.str_0425)
+        conf >= 50 -> Color(0xFFD98200) to tr(R.string.str_0399)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant to tr(R.string.str_0400)
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(color))
         Text(
-            "ثقة القراءة $conf%  •  $label",
+            tr(R.string.str_0426, conf, label),
             style = MaterialTheme.typography.labelSmall, color = color
         )
     }
@@ -441,7 +444,7 @@ private fun EvidenceDialog(path: String, onClose: () -> Unit) {
     val bmp = remember(path) { try { BitmapFactory.decodeFile(path) } catch (_: Throwable) { null } }
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text("لقطة الإثبات") },
+        title = { Text(tr(R.string.str_0423)) },
         text = {
             if (bmp != null) {
                 Image(
@@ -450,12 +453,12 @@ private fun EvidenceDialog(path: String, onClose: () -> Unit) {
                     contentScale = ContentScale.Fit
                 )
             } else {
-                Text("الصورة مش موجودة (ممكن تكون اتمسحت تلقائياً لأن التطبيق بيحتفظ بآخر 300 لقطة).")
+                Text(tr(R.string.str_0427))
             }
         },
         confirmButton = {
-            if (bmp != null) TextButton(onClick = { Evidence.share(ctx, path) }) { BtnText("مشاركة") }
+            if (bmp != null) TextButton(onClick = { Evidence.share(ctx, path) }) { BtnText(tr(R.string.str_0428)) }
         },
-        dismissButton = { TextButton(onClick = onClose) { BtnText("إغلاق") } }
+        dismissButton = { TextButton(onClick = onClose) { BtnText(tr(R.string.str_0002)) } }
     )
 }

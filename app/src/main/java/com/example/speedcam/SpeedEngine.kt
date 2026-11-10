@@ -37,6 +37,18 @@ class SpeedEngine(
 
     /** مراقب ثبات الكاميرا: مرجع محفوظ + كشف الإزاحة والاهتزاز (بيأثر على ثقة القياسات). */
     val stability = CameraStability(context.applicationContext)
+
+    /** مراقب وضوح الصورة (حدّة وسطوع) بيتحدّث كل ثانية، حتى والقياس واقف عشان المستخدم يضبط الكاميرا. */
+    val quality = ImageQualityMonitor()
+
+    /** وضع اختبار الدقة: بيلتقط عبورات عربية بسرعة معروفة ويحسب الانحياز والتشتت. */
+    val accTest = AccuracyTest()
+
+    /** فحص المقياس بأطوال العربيات: بينبّه لو المسافة بين الخطين مش منطقية. */
+    val scaleCheck = ScaleCheck()
+
+    /** جامع بيانات التدريب (لقطات + صناديق) لتدريب موديل مخصوص لعربيات بلدك. */
+    val collector = TrainingCollector(context.applicationContext)
     @Volatile private var movedAlerted = false
 
     // تصنيف النوع في الوضع السريع بيتم على خيط مستقل عشان ما يبطّئش الكاميرا
@@ -126,15 +138,21 @@ class SpeedEngine(
     override fun analyze(image: ImageProxy) {
         try {
             val on = ready()
-            // حتى والقياس واقف: لو الويزارد طلب حفظ مرجع نلتقط الفريم ده بس
-            if (!on && !stability.wantsFrame()) return
             val nowMs = SystemClock.elapsedRealtime()
+            // والقياس واقف بنحلل فريم واحد كل ثانية بس (لفحص الوضوح)، أو فريم الويزارد لو طلب حفظ مرجع
+            val needStab = !on && stability.wantsFrame()
+            val needQ = !on && quality.due(nowMs)
+            if (!on && !needStab && !needQ) return
             val raw = image.toBitmap()
             val rot = image.imageInfo.rotationDegrees
             val frame = if (rot == 0) raw else Bitmap.createBitmap(
                 raw, 0, 0, raw.width, raw.height, Matrix().apply { postRotate(rot.toFloat()) }, true
             )
-            if (!on) { stability.offer(frame, nowMs, true); return }
+            if (!on) {
+                if (needStab) stability.offer(frame, nowMs, true)
+                if (needQ) quality.offer(frame, nowMs)
+                return
+            }
             process(frame, image.imageInfo.timestamp, nowMs)
         } catch (t: Throwable) {
             Log.e(TAG, "analyze failed", t)
@@ -151,7 +169,9 @@ class SpeedEngine(
         try {
             previewFrame.value = frame
             if (!ready()) {
-                if (stability.wantsFrame()) stability.offer(frame, SystemClock.elapsedRealtime(), true)
+                val now = SystemClock.elapsedRealtime()
+                if (stability.wantsFrame()) stability.offer(frame, now, true)
+                quality.offer(frame, now)
                 return
             }
             process(frame, tsNs, SystemClock.elapsedRealtime())
@@ -164,6 +184,7 @@ class SpeedEngine(
             val tPrep = SystemClock.elapsedRealtime()
             val s = settings()
             checkStability(frame, nowMs, s)
+            quality.offer(frame, nowMs)
             val aspect = frame.width.toFloat() / frame.height
 
             if (s.fastMode) {
@@ -181,7 +202,9 @@ class SpeedEngine(
             }
 
             val det = obtainDetector(s)
-            var dets = synchronized(detLock) { det.detect(frame, s.minScore) }
+            // منطقة الكشف (قص حوالين الخطين) لتكبير العربيات البعيدة؛ null = الصورة كلها
+            val zone = DetectionZone.compute(s, aspect)
+            var dets = synchronized(detLock) { det.detect(frame, s.minScore, zone) }
             if (!det.usingCustom) dets = dets.map { SizeClassifier.refine(it, s) }
 
             val tDet = SystemClock.elapsedRealtime()
@@ -189,9 +212,16 @@ class SpeedEngine(
             detAvg = if (detAvg == 0f) (tDet - tPrep).toFloat() else detAvg * 0.8f + (tDet - tPrep) * 0.2f
 
             val res = tracker.update(dets, tsNs, aspect, s)
+            scaleCheck.offer(res.tracked, s)
+            if (s.collectOn) collector.offer(frame, nowMs, s) { bmp ->
+                // كشف منفصل على الصورة كلها (من غير قص المنطقة) عشان كل العربيات تتعلّم
+                var d = synchronized(detLock) { det.detect(bmp, TrainingCollector.LABEL_MIN_SCORE) }
+                if (!det.usingCustom) d = d.map { SizeClassifier.refine(it, s) }
+                d
+            }
             val plates = s.readPlates && plateReader.ready
             res.stopped.forEach { st ->
-                raise("مركبة واقفة", "${st.type.ar} واقفة في الصورة من أكتر من ${s.stopSec} ثانية", true)
+                raise(tr(R.string.str_0314), tr(R.string.str_0315, st.type.ar, s.stopSec), true)
             }
             res.events.forEach { ev ->
                 // لقطة إثبات للمتجاوزين بس (الفريم الحالي لسه فيه المركبة لأن الحدث بيطلع بعد العبور بفريمين)
@@ -442,11 +472,11 @@ class SpeedEngine(
     private fun checkAnomalies(ev: SpeedEvent) {
         val s = settings()
         if (s.allowedDir != 0 && ev.direction != s.allowedDir) {
-            raise("عكس الاتجاه", "${ev.type.ar} ماشية عكس الاتجاه المسموح" + (if (ev.speedKmh >= 0) " (${ev.speedKmh.roundToInt()} كم/س)" else ""), true, 30_000L)
+            raise(tr(R.string.str_0316), tr(R.string.str_0317, ev.type.ar) + (if (ev.speedKmh >= 0) tr(R.string.str_0318, Units.spdI(ev.speedKmh)) else ""), true, 30_000L)
         }
         if (ev.speedKmh < 0) return
         if (s.alertSpeed > 0 && ev.speedKmh >= s.alertSpeed && (ev.conf == 0 || ev.conf >= 50)) {
-            raise("سرعة عالية جداً", "${ev.type.ar}: ${ev.speedKmh.roundToInt()} كم/س (حد التنبيه ${s.alertSpeed})", true, 20_000L)
+            raise(tr(R.string.str_0319), tr(R.string.str_0320, ev.type.ar, Units.spdI(ev.speedKmh), Units.spdI(s.alertSpeed)), true, 20_000L)
         }
         if (s.congestionKmh > 0) {
             val now = System.currentTimeMillis()
@@ -457,7 +487,7 @@ class SpeedEngine(
                 if (recentSpeeds.size >= 6) RobustStats.median(recentSpeeds.map { it.second }) else null
             }
             if (med != null && med < s.congestionKmh) {
-                raise("ازدحام", "وسيط سرعة آخر 6 مركبات ${med.roundToInt()} كم/س (أقل من ${s.congestionKmh})", true, 5 * 60_000L)
+                raise(tr(R.string.str_0321), tr(R.string.str_0322, Units.spdI(med), Units.spdI(s.congestionKmh)), true, 5 * 60_000L)
             }
         }
     }
@@ -469,7 +499,7 @@ class SpeedEngine(
         if (s.movedGuard && st.level == 2) {
             if (!movedAlerted) {
                 movedAlerted = true
-                raise("الكاميرا اتحركت", st.message, true, 10 * 60_000L)
+                raise(tr(R.string.str_0323), st.message, true, 10 * 60_000L)
             }
         } else if (st.level < 2) movedAlerted = false
     }
@@ -484,9 +514,10 @@ class SpeedEngine(
 
     private fun handleEvent(ev0: SpeedEvent, plate: PlateHit? = null, waitPlate: Boolean = false, evidence: Bitmap? = null) {
         val ev = withStability(ev0)
+        accTest.offer(ev, settings())
         sessionCount++
         checkAnomalies(ev)
-        val baseText = if (ev.speedKmh < 0) "${ev.type.ar}: تم العد" else "${ev.type.ar}: ${ev.speedKmh.roundToInt()} كم/س" + (if (ev.conf in 1..49) "  ⚠ ثقة ضعيفة" else "")
+        val baseText = if (ev.speedKmh < 0) tr(R.string.str_0324, ev.type.ar) else tr(R.string.str_0325, ev.type.ar, Units.spdI(ev.speedKmh)) + (if (ev.conf in 1..49) tr(R.string.str_0326) else "")
         lastEvent = baseText
         val ts = System.currentTimeMillis()
         scope.launch(Dispatchers.IO) {

@@ -5,7 +5,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
+import android.os.Build
 import android.util.Log
 import android.util.Range
 import android.util.Size
@@ -14,6 +16,8 @@ import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
@@ -36,7 +40,9 @@ data class CameraCaps(
     val evMin: Int = 0,
     val evMax: Int = 0,
     val evStep: Float = 0f,
-    val fpsRanges: String = ""
+    val fpsRanges: String = "",
+    val maxZoom: Float = 1f,
+    val hqDistortion: Boolean = false     // الكاميرا بتدعم تصحيح التشويه بأعلى جودة
 )
 
 /**
@@ -59,7 +65,10 @@ class CameraHost(
     private var providerRequested = false
     private var camera: Camera? = null
     private var preview: Preview? = null
-    private var boundHighRes: Boolean? = null
+    private var boundRes: String? = null      // الدقة اللي الكاميرا مربوطة بيها دلوقتي (720p/1080p/360p)
+    private var lastFocusKey = ""
+
+    private fun resKey(s: AppSettings) = "${s.highRes}|${s.fullHd}"
 
     private var activityVisible = false
     private var serviceUp = false
@@ -125,11 +134,12 @@ class CameraHost(
             return
         }
         if (s.sourceMode == 1) return
-        if (camera != null && boundHighRes != null && boundHighRes != s.highRes) {
+        if (camera != null && boundRes != null && boundRes != resKey(s)) {
             refresh()
             return
         }
         applyControls(s)
+        applyFocus(s)
     }
 
     /** يقرر هل الكاميرا تشتغل ولا تقفل، حسب ظهور الشاشة/الخدمة والإذن. */
@@ -154,7 +164,7 @@ class CameraHost(
             return
         }
         val s = settings()
-        if (camera != null && boundHighRes == s.highRes) return
+        if (camera != null && boundRes == resKey(s)) return
         bind(p, s)
     }
 
@@ -183,7 +193,7 @@ class CameraHost(
                 .setResolutionSelector(ResolutionSelector.Builder().setAspectRatioStrategy(ratio).build())
                 .build()
             previewView?.let { pr.setSurfaceProvider(it.surfaceProvider) }
-            val size = if (s.highRes) Size(1280, 720) else Size(640, 360)
+            val size = if (s.fullHd) Size(1920, 1080) else if (s.highRes) Size(1280, 720) else Size(640, 360)
             val an = ImageAnalysis.Builder()
                 .setResolutionSelector(
                     ResolutionSelector.Builder()
@@ -196,15 +206,17 @@ class CameraHost(
                 .build().also { it.setAnalyzer(executor, engine) }
             camera = p.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, pr, an)
             preview = pr
-            boundHighRes = s.highRes
+            boundRes = resKey(s)
             lastControlKey = ""
+            lastFocusKey = ""
             readCaps()
             applyControls(s)
+            applyFocus(s, force = true)
         } catch (e: Exception) {
             Log.e(TAG, "bind failed", e)
             camera = null
             preview = null
-            boundHighRes = null
+            boundRes = null
         }
     }
 
@@ -212,8 +224,9 @@ class CameraHost(
         try { provider?.unbindAll() } catch (_: Exception) { }
         camera = null
         preview = null
-        boundHighRes = null
+        boundRes = null
         lastControlKey = ""
+        lastFocusKey = ""
     }
 
     // =====================  إمكانيات الجهاز  =====================
@@ -231,9 +244,13 @@ class CameraHost(
             val manual = capList?.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR) == true &&
                 iso != null && exp != null
             val ev = cam.cameraInfo.exposureState
+            val hqDist = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+                info.getCameraCharacteristic(CameraCharacteristics.DISTORTION_CORRECTION_AVAILABLE_MODES)
+                    ?.contains(CameraMetadata.DISTORTION_CORRECTION_MODE_HIGH_QUALITY) == true
             caps.value = CameraCaps(
                 ready = true,
                 manualSupported = manual,
+                hqDistortion = hqDist,
                 isoMin = iso?.lower ?: 100,
                 isoMax = iso?.upper ?: 3200,
                 expMinNs = exp?.lower ?: 0L,
@@ -241,7 +258,8 @@ class CameraHost(
                 evMin = ev.exposureCompensationRange.lower,
                 evMax = ev.exposureCompensationRange.upper,
                 evStep = ev.exposureCompensationStep.toFloat(),
-                fpsRanges = fpsRangeList.joinToString("  ") { "${it.lower}-${it.upper}" }
+                fpsRanges = fpsRangeList.joinToString("  ") { "${it.lower}-${it.upper}" },
+                maxZoom = cam.cameraInfo.zoomState.value?.maxZoomRatio ?: 1f
             )
         } catch (t: Throwable) {
             Log.w(TAG, "readCaps failed", t)
@@ -250,7 +268,8 @@ class CameraHost(
                 ready = true,
                 evMin = ev?.exposureCompensationRange?.lower ?: 0,
                 evMax = ev?.exposureCompensationRange?.upper ?: 0,
-                evStep = ev?.exposureCompensationStep?.toFloat() ?: 0f
+                evStep = ev?.exposureCompensationStep?.toFloat() ?: 0f,
+                maxZoom = try { cam.cameraInfo.zoomState.value?.maxZoomRatio ?: 1f } catch (_: Throwable) { 1f }
             )
         }
     }
@@ -275,13 +294,24 @@ class CameraHost(
         val c = caps.value
         val manual = s.manualExp && c.manualSupported
         val ev = if (c.evMax > c.evMin) s.evIndex.coerceIn(c.evMin, c.evMax) else 0
-        val key = "${s.lockFps}|${s.targetFps}|$manual|${s.shutterDenom}|${s.isoManual}|$ev"
+        val zoom = s.zoom.coerceIn(1f, c.maxZoom.coerceAtLeast(1f))
+        val key = "${s.lockFps}|${s.targetFps}|$manual|${s.shutterDenom}|${s.isoManual}|$ev|${s.ispDistortion}|${s.stabOff}|$zoom"
+        val zoomChanged = key != lastControlKey && !lastControlKey.endsWith("|$zoom")
         if (key == lastControlKey) return
         lastControlKey = key
         try {
             if (c.evMax > c.evMin) cam.cameraControl.setExposureCompensationIndex(ev)
 
             val b = CaptureRequestOptions.Builder()
+            if (s.ispDistortion && c.hqDistortion && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                // تصحيح تشويه العدسة جوه الكاميرا نفسها بأعلى جودة (على الأجهزة اللي بتدعمه)، فالصورة توصلنا مستقيمة أكتر
+                b.setCaptureRequestOption(CaptureRequest.DISTORTION_CORRECTION_MODE, CameraMetadata.DISTORTION_CORRECTION_MODE_HIGH_QUALITY)
+            }
+            if (s.stabOff) {
+                // التثبيت الإلكتروني/البصري بيقصّ ويلوي الفريمات ويحرّك الصورة، وده بيبوّظ قياس الزمن والمسافة على حامل ثابت
+                b.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
+                b.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF)
+            }
             if (manual) {
                 val frameNs = (1_000_000_000.0 / s.targetFps.coerceAtLeast(5)).toLong()
                 var expNs = (1_000_000_000.0 / s.shutterDenom.coerceAtLeast(1)).toLong()
@@ -297,9 +327,39 @@ class CameraHost(
             }
             // لو مفيش أي اختيار، الـ builder فاضي: بيرجّع الكاميرا للوضع التلقائي
             Camera2CameraControl.from(cam.cameraControl).setCaptureRequestOptions(b.build())
+            if (c.maxZoom > 1.01f || zoom > 1f) cam.cameraControl.setZoomRatio(zoom)
+            // بعد تغيير الزووم الفوكس لازم يتظبط تاني
+            if (zoomChanged && s.focusLock) applyFocus(s, force = true)
         } catch (t: Throwable) {
             Log.w(TAG, "applyControls failed", t)
         }
+    }
+
+    // =====================  الفوكس  =====================
+
+    /** يضبط الفوكس على وسط الصورة (الطريق) ويثبّته (disableAutoCancel) عشان ما يتخبّطش لما عربية تعدّي. */
+    private fun lockFocusAtCenter(cam: Camera) {
+        val pt = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f)
+        val action = FocusMeteringAction.Builder(pt, FocusMeteringAction.FLAG_AF).disableAutoCancel().build()
+        cam.cameraControl.startFocusAndMetering(action)
+    }
+
+    private fun applyFocus(s: AppSettings, force: Boolean = false) {
+        val cam = camera ?: return
+        val key = "${s.focusLock}"
+        if (!force && key == lastFocusKey) return
+        lastFocusKey = key
+        try {
+            if (s.focusLock) lockFocusAtCenter(cam) else cam.cameraControl.cancelFocusAndMetering()
+        } catch (t: Throwable) {
+            Log.w(TAG, "applyFocus failed", t)
+        }
+    }
+
+    /** "اضبط الفوكس دلوقتي": يعيد ضبط الفوكس على وسط الصورة ويثبّته، حتى لو التثبيت التلقائي مقفول. */
+    fun refocus() {
+        val cam = camera ?: return
+        try { lockFocusAtCenter(cam) } catch (t: Throwable) { Log.w(TAG, "refocus failed", t) }
     }
 
     private companion object {

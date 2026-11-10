@@ -84,10 +84,10 @@ class RecordingService : Service() {
     private fun statusText(core: Core): String {
         val ov = core.engine.overlay.value
         val h = core.health.value
-        val bat = if (h.batteryPct >= 0) " | بطارية ${h.batteryPct}%" else ""
+        val bat = if (h.batteryPct >= 0) tr(R.string.str_0188, h.batteryPct) else ""
         val temp = if (h.tempC > 0f) " | ${h.tempC.toInt()}°" else ""
         val warn = if (h.message.isNotEmpty()) "\n⚠ ${h.message}" else ""
-        return "تم عدّ ${ov.sessionCount} | FPS ${ov.fps}$temp$bat$warn"
+        return tr(R.string.str_0189, ov.sessionCount, ov.fps, temp, bat, warn)
     }
 
     @SuppressLint("MissingPermission")
@@ -117,8 +117,8 @@ object RecordingNotifications {
     fun ensureChannels(ctx: Context) {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
-        nm.createNotificationChannel(NotificationChannel(CH_RUN, "القياس في الخلفية", NotificationManager.IMPORTANCE_LOW))
-        nm.createNotificationChannel(NotificationChannel(CH_ALERT, "تنبيهات الحرارة والبطارية", NotificationManager.IMPORTANCE_HIGH))
+        nm.createNotificationChannel(NotificationChannel(CH_RUN, tr(R.string.str_0190), NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CH_ALERT, tr(R.string.str_0191), NotificationManager.IMPORTANCE_HIGH))
     }
 
     private fun flags(): Int = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -132,14 +132,14 @@ object RecordingNotifications {
         )
         return NotificationCompat.Builder(ctx, CH_RUN)
             .setSmallIcon(R.drawable.ic_stat_speedcam)
-            .setContentTitle("رادار السرعة شغّال في الخلفية")
+            .setContentTitle(tr(R.string.str_0192))
             .setContentText(text.substringBefore('\n'))
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setContentIntent(openApp(ctx))
-            .addAction(R.drawable.ic_stat_speedcam, "إيقاف القياس", stop)
+            .addAction(R.drawable.ic_stat_speedcam, tr(R.string.str_0193), stop)
             .build()
     }
 

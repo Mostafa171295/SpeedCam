@@ -34,7 +34,10 @@ class PlateDiag(val attempts: List<PlateAttempt>, val best: PlateHit?, val ms: L
  */
 class PlateReader(context: Context) {
     private val appContext = context.applicationContext
-    private val ocr = PlateOcr(appContext)
+    /** الصيغة الحالية للوحات (بلد): بتحدد لغة الـ OCR وقاعدة قبول النص. بتتغيّر من الإعدادات عن طريق setProfile(). */
+    @Volatile var profile: PlateProfile = PlateProfile.resolve(PlateProfile.AUTO)
+        private set
+    @Volatile private var ocr = PlateOcr(appContext, profile.ocrLang, profile.whitelist)
     private val ocrLock = Any()
     private val executor = Executors.newSingleThreadExecutor()
     private val busy = AtomicBoolean(false)
@@ -110,6 +113,24 @@ class PlateReader(context: Context) {
 
     fun reset() = tracks.clear()
 
+    /** اسم ملف اللغة المطلوب للصيغة الحالية (مثلاً ara.traineddata أو eng.traineddata). */
+    fun dataFileName(): String = ocr.dataName
+
+    /**
+     * تبديل صيغة اللوحات. لو اللغة اتغيرت بنقفل المحرك القديم ونبدأ بمحرك جديد (وملفه ممكن يحتاج تحميل)،
+     * وبنمسح القراءات المتجمّعة لأنها بصيغة تانية. المستدعي بيطلب ensureData() بعدها لو القراءة مفعّلة.
+     */
+    fun setProfile(p: PlateProfile) {
+        if (p.id == profile.id) return
+        synchronized(ocrLock) {
+            ocr.close()
+            profile = p
+            ocr = PlateOcr(appContext, p.ocrLang, p.whitelist)
+        }
+        tracks.clear()
+        dataState.value = if (ocr.isDataReady()) PLATE_DATA_READY else PLATE_DATA_CHECKING
+    }
+
     private fun votes(id: Int) = tracks.getOrPut(id) { TrackVotes() }
 
     /** أفضل قراءة لمركبة (ID التتبع)، أو null لو مفيش قراءة موثوقة. */
@@ -164,7 +185,7 @@ class PlateReader(context: Context) {
         if (rect != null) {
             val sub = Bitmap.createBitmap(crop, rect.left, rect.top, rect.width(), rect.height())
             try {
-                best = readPrepared(sub, "اللوحة المحدَّدة تلقائياً", true, trace)
+                best = readPrepared(sub, tr(R.string.plate_att_located), true, trace)
             } finally {
                 if (sub !== crop) sub.recycle()
             }
@@ -172,7 +193,7 @@ class PlateReader(context: Context) {
             val b0 = best
             if (b0 != null && b0.conf >= GOOD_CONF) return b0
         }
-        val full = readPrepared(crop, "القص الكامل", false, trace)
+        val full = readPrepared(crop, tr(R.string.plate_att_full), false, trace)
         return better(best, full)
     }
 
@@ -191,7 +212,7 @@ class PlateReader(context: Context) {
                 return null
             }
             val (text, conf) = res
-            val parsed = if (conf >= MIN_CONF) PlateParser.parse(text) else null
+            val parsed = if (conf >= MIN_CONF) profile.parse(text) else null
             val hit = parsed?.let { PlateHit(it.letters, it.digits, conf) }
             if (trace != null) {
                 trace += PlateAttempt(name, src.copy(Bitmap.Config.ARGB_8888, false), prepared, text.trim(), conf, hit)
@@ -209,9 +230,9 @@ class PlateReader(context: Context) {
      */
     fun diagnose(img: Bitmap, box: NBox?): PlateDiag {
         val t0 = System.currentTimeMillis()
-        if (!ready) return PlateDiag(emptyList(), null, 0, "ملف اللغة العربية لسه مش جاهز")
+        if (!ready) return PlateDiag(emptyList(), null, 0, tr(R.string.plate_note_notready))
         val crop: Bitmap? = if (box != null) cropLower(img, box) else img.copy(Bitmap.Config.ARGB_8888, false)
-        if (crop == null) return PlateDiag(emptyList(), null, 0, "المركبة صغيرة جداً في الصورة")
+        if (crop == null) return PlateDiag(emptyList(), null, 0, tr(R.string.plate_note_small))
         val list = ArrayList<PlateAttempt>()
         val hit: PlateHit? = try {
             readCrop(crop, list)
@@ -219,10 +240,10 @@ class PlateReader(context: Context) {
             if (crop !== img) crop.recycle()
         }
         val note = when {
-            list.isEmpty() -> "تعذّر تشغيل محرك القراءة"
-            list.size == 1 && list[0].name.startsWith("اللوحة") -> "اتحددت اللوحة تلقائياً واتقرأت من أول محاولة."
-            list.size == 1 -> "ما اتحددتش اللوحة تلقائياً، فاتقرأ القص كله."
-            else -> "القراءة من اللوحة المحدَّدة مكانتش واضحة، فاتجرّب القص الكامل كمان."
+            list.isEmpty() -> tr(R.string.plate_note_noengine)
+            list.size == 1 && list[0].name == tr(R.string.plate_att_located) -> tr(R.string.plate_note_located)
+            list.size == 1 -> tr(R.string.plate_note_nolocate)
+            else -> tr(R.string.plate_note_retry)
         }
         return PlateDiag(list, hit, System.currentTimeMillis() - t0, note)
     }

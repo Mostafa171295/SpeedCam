@@ -74,9 +74,9 @@ object VideoFrames {
                 val f = extractor.getTrackFormat(i)
                 if ((f.getString(MediaFormat.KEY_MIME) ?: "").startsWith("video/")) { track = i; format = f; break }
             }
-            if (track < 0 || format == null) throw IllegalStateException("الملف ده مفيهوش فيديو")
+            if (track < 0 || format == null) throw IllegalStateException(tr(R.string.str_0429))
             extractor.selectTrack(track)
-            val mime = format.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException("نوع الفيديو غير معروف")
+            val mime = format.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException(tr(R.string.str_0430))
             val rotation = if (format.containsKey("rotation-degrees")) format.getInteger("rotation-degrees") else 0
             val durationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else 0L
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
@@ -202,7 +202,7 @@ class VideoAnalyzer(private val ctx: Context) {
     suspend fun run(uri: Uri, analysisFps: Int, s: AppSettings, onProgress: (Float) -> Unit): Result =
         withContext(Dispatchers.Default) {
             val det = VehicleDetector(ctx, s.useGpu)
-            if (!det.isReady) throw IllegalStateException("ملف الموديل مش موجود في assets")
+            if (!det.isReady) throw IllegalStateException(tr(R.string.str_0431))
             val tracker = SpeedTracker()
             val raw = s.copy(speedCalib = 1f, speedOffset = 0f, countAll = false)
             val rows = ArrayList<Row>()
@@ -280,7 +280,7 @@ fun VideoTestCard(vm: MainViewModel) {
     var error by remember { mutableStateOf<String?>(null) }
     var job by remember { mutableStateOf<Job?>(null) }
     var realTxt by remember { mutableStateOf("") }
-    val real = realTxt.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+    val real = realTxt.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }?.let { Units.toKmh(it).toFloat() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { u ->
         if (u != null) {
@@ -299,7 +299,7 @@ fun VideoTestCard(vm: MainViewModel) {
                 throw e
             } catch (e: Throwable) {
                 Log.e(TAG, "analysis failed", e)
-                error = e.message ?: "فشل تحليل الفيديو"
+                error = e.message ?: tr(R.string.str_0432)
             } finally {
                 running = false
             }
@@ -308,12 +308,12 @@ fun VideoTestCard(vm: MainViewModel) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            "صوّر فيديو للطريق بكاميرا الموبايل من نفس مكان التثبيت، وحلّله هنا أكتر من مرة وجرّب أي تعديل في الإعدادات " +
-                "(الخطين، المسافة، المعايرة) على نفس الفيديو. التحليل بيستخدم نفس الكشف والتتبع، ومش بيسجّل أي حاجة في قاعدة البيانات.",
+            tr(R.string.str_0433) +
+                tr(R.string.str_0434),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Button(onClick = { picker.launch("video/*") }, enabled = !running) {
-            BtnText(if (uri == null) "اختيار فيديو" else "تغيير الفيديو")
+            BtnText(if (uri == null) tr(R.string.str_0435) else tr(R.string.str_0436))
         }
         preview?.let { bmp ->
             Box(Modifier.fillMaxWidth().aspectRatio(bmp.width.toFloat() / bmp.height).clip(RoundedCornerShape(10.dp))) {
@@ -331,19 +331,19 @@ fun VideoTestCard(vm: MainViewModel) {
                 }
             }
             Text(
-                "الخط الأول (برتقالي) والثاني (أخضر) بنفس مكانهم في الإعدادات. عدّلهم من كارت المعايرة فوق لحد ما ينطبقوا على علامتي القياس على الأرض.",
+                tr(R.string.str_0437),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Text("عدد الفريمات المحللة في الثانية (بيحاكي سرعة جهازك)", fontWeight = FontWeight.Bold)
+        Text(tr(R.string.str_0438), fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(10, 15, 30).forEach { v ->
                 FilterChip(fps == v, { fps = v }, { Text("$v") }, enabled = !running)
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = uri != null && !running, onClick = { start() }, modifier = Modifier.weight(1f)) { BtnText("ابدأ التحليل") }
-            if (running) OutlinedButton(onClick = { job?.cancel() }, modifier = Modifier.weight(1f)) { BtnText("إيقاف") }
+            Button(enabled = uri != null && !running, onClick = { start() }, modifier = Modifier.weight(1f)) { BtnText(tr(R.string.str_0439)) }
+            if (running) OutlinedButton(onClick = { job?.cancel() }, modifier = Modifier.weight(1f)) { BtnText(tr(R.string.str_0058)) }
         }
         if (running) {
             Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
@@ -355,29 +355,29 @@ fun VideoTestCard(vm: MainViewModel) {
 
         result?.let { r ->
             Text(
-                "اتحلل ${r.frames} فريم (${fmtTime(r.videoSec)} من الفيديو)  •  ${r.rows.size} قياس  •  " +
-                    "زمن الكشف ${r.detMs} ms للفريم، يعني جهازك يقدر يحلل حوالي ${(1000f / max(1, r.detMs)).roundToInt()} فريم/ث (من زمن الكشف فقط).",
+                tr(R.string.str_0440, r.frames, fmtTime(r.videoSec), r.rows.size) +
+                    tr(R.string.str_0441, r.detMs, (1000f / max(1, r.detMs)).roundToInt()),
                 style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold
             )
             if (r.rows.isEmpty()) {
                 Text(
-                    "ما اتقاسش أي عبور كامل. تأكد إن الخطين على مسار العربيات وإن العربية بتعدي الخطين الاتنين، وإن المسافة بينهم مظبوطة.",
+                    tr(R.string.str_0442),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 OutlinedTextField(
                     value = realTxt, onValueChange = { realTxt = it },
-                    label = { Text("السرعة الحقيقية للعربية (كم/س، اختياري)") },
+                    label = { Text(tr(R.string.str_0443)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    "لو كل العربيات في الفيديو بنفس السرعة المعروفة، هتظهر نسبة الخطأ لكل قياس، وتقدر تضيف أي قياس كعينة معايرة.",
+                    tr(R.string.str_0444),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                r.rows.take(MAX_ROWS_SHOWN).forEach { row -> VideoRowItem(row, s, real) { rv -> addCalSample(s, vm::update, rv, row.rawKmh.toFloat()); Toast.makeText(ctx, "تمت إضافة العينة", Toast.LENGTH_SHORT).show() } }
+                r.rows.take(MAX_ROWS_SHOWN).forEach { row -> VideoRowItem(row, s, real) { rv -> addCalSample(s, vm::update, rv, row.rawKmh.toFloat()); Toast.makeText(ctx, tr(R.string.str_0445), Toast.LENGTH_SHORT).show() } }
                 if (r.rows.size > MAX_ROWS_SHOWN) {
-                    Text("معروض أول $MAX_ROWS_SHOWN قياس من ${r.rows.size}.", style = MaterialTheme.typography.bodySmall)
+                    Text(tr(R.string.str_0446, MAX_ROWS_SHOWN, r.rows.size), style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -387,7 +387,7 @@ fun VideoTestCard(vm: MainViewModel) {
 @Composable
 private fun VideoRowItem(row: VideoAnalyzer.Row, s: AppSettings, real: Float?, onAddSample: (Float) -> Unit) {
     val cal = s.calibrate(row.rawKmh)
-    val errTxt = if (row.errKmh >= 0.5f) " ± ${row.errKmh.roundToInt()}" else ""
+    val errTxt = if (row.errKmh >= 0.5f) " ± ${Units.spdI(row.errKmh)}" else ""
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically
@@ -397,21 +397,21 @@ private fun VideoRowItem(row: VideoAnalyzer.Row, s: AppSettings, real: Float?, o
             UiImage(th.asImageBitmap(), null, Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("${row.type.ar}  •  عند ${fmtTime(row.atSec)}", fontWeight = FontWeight.Bold)
+            Text(tr(R.string.str_0447, row.type.ar, fmtTime(row.atSec)), fontWeight = FontWeight.Bold)
             Text(
-                "خام ${String.format(Locale.US, "%.1f", row.rawKmh)}  •  بعد المعايرة ${String.format(Locale.US, "%.1f", cal)}$errTxt كم/س" +
-                    if (row.conf > 0) "  •  ثقة ${row.conf}%" else "",
+                tr(R.string.str_0448, String.format(Locale.US, "%.1f", Units.spd(row.rawKmh)), String.format(Locale.US, "%.1f", Units.spd(cal)), errTxt) +
+                    if (row.conf > 0) tr(R.string.str_0160, row.conf) else "",
                 style = MaterialTheme.typography.bodySmall
             )
             if (real != null) {
                 val pct = (cal - real) / real * 100.0
                 val bad = kotlin.math.abs(pct) > 10.0
                 Text(
-                    "الخطأ عن الحقيقي: " + (if (pct >= 0) "+" else "") + String.format(Locale.US, "%.1f", pct) + "%",
+                    tr(R.string.str_0449) + (if (pct >= 0) "+" else "") + String.format(Locale.US, "%.1f", pct) + "%",
                     style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold,
                     color = if (bad) MaterialTheme.colorScheme.error else Color(0xFF2E7D32)
                 )
-                TextButton(onClick = { onAddSample(real) }) { BtnText("أضف كعينة معايرة") }
+                TextButton(onClick = { onAddSample(real) }) { BtnText(tr(R.string.str_0450)) }
             }
         }
     }

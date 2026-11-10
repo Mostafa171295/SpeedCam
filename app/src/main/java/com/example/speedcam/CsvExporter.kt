@@ -27,18 +27,18 @@ object CsvExporter {
             os.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
             os.writer(Charsets.UTF_8).buffered().use { w ->
                 w.write("sep=,\r\n")
-                w.write("الرقم,التاريخ,الوقت,الساعة,نوع المركبة,السرعة (كم/س),الاتجاه,اللوحة,حروف اللوحة,أرقام اللوحة,ثقة القراءة %,ثقة السرعة %,هامش الخطأ ± (كم/س),الحارة\r\n")
+                w.write(tr(R.string.str_0076) + "\r\n")
                 for (r in records.sortedBy { it.timestamp }) {
                     val d = Date(r.timestamp)
                     val type = VehicleType.fromName(r.vehicleType)?.ar ?: r.vehicleType
                     val row = listOf(
                         r.id.toString(), dateF.format(d), timeF.format(d), hourF.format(d), type,
-                        if (r.speedKmh < 0) "" else String.format(Locale.US, "%.1f", r.speedKmh), directionLabel(r.direction, axisHorizontal),
+                        if (r.speedKmh < 0) "" else String.format(Locale.US, "%.1f", Units.spd(r.speedKmh)), directionLabel(r.direction, axisHorizontal),
                         if (r.plateDigits.isEmpty()) "" else PlateParser.display(r.plateLetters, r.plateDigits),
                         r.plateLetters.toList().joinToString(" "), r.plateDigits,
                         if (r.plateDigits.isEmpty()) "" else r.plateConf.toString(),
                         if (r.speedConf <= 0) "" else r.speedConf.toString(),
-                        if (r.speedErr <= 0f) "" else String.format(Locale.US, "%.1f", r.speedErr),
+                        if (r.speedErr <= 0f) "" else String.format(Locale.US, "%.1f", Units.spd(r.speedErr)),
                         if (r.lane <= 0) "" else r.lane.toString()
                     )
                     w.write(row.joinToString(",") { "\"" + it.replace("\"", "\"\"") + "\"" })
@@ -56,7 +56,7 @@ object CsvExporter {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        ctx.startActivity(Intent.createChooser(i, "مشاركة ملف Excel"))
+        ctx.startActivity(Intent.createChooser(i, tr(R.string.str_0077)))
     }
 
     fun saveToDownloads(ctx: Context, file: File): Boolean {
@@ -131,16 +131,16 @@ object CsvExporter {
             os.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
             os.writer(Charsets.UTF_8).buffered().use { w ->
                 w.write("sep=,\r\n")
-                val head = mutableListOf("التاريخ", if (byDay) "الفترة" else "من الساعة")
-                if (!byDay) head += "إلى الساعة"
+                val head = mutableListOf(tr(R.string.str_0078), if (byDay) tr(R.string.str_0079) else tr(R.string.str_0080))
+                if (!byDay) head += tr(R.string.str_0081)
                 head += VehicleType.entries.map { it.ar }
-                head += "الإجمالي"
+                head += tr(R.string.str_0082)
                 w.write(head.joinToString(",") { "\"$it\"" } + "\r\n")
                 for (b in buckets.sortedBy { it.startMs }) {
                     val cal = Calendar.getInstance().apply { timeInMillis = b.startMs }
                     val h = cal.get(Calendar.HOUR_OF_DAY)
                     val row = mutableListOf(dateF.format(Date(b.startMs)))
-                    if (byDay) row += "يوم كامل"
+                    if (byDay) row += tr(R.string.str_0083)
                     else {
                         row += String.format(Locale.US, "%02d:00", h)
                         row += String.format(Locale.US, "%02d:00", (h + 1) % 24)

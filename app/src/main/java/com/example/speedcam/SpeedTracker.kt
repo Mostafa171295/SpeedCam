@@ -344,7 +344,7 @@ class SpeedTracker {
                 val conf = (confidence(t) + confAdj).coerceIn(1, 100)
                 events += SpeedEvent(t.id, t.type(), vFinal, if ((a < b) == (Geo.lineA(s) < Geo.lineB(s))) 1 else 2, conf, err.toFloat(), Geo.lane(t.box, s))
             } else {
-                rejectNote = "مُهمَل: " + v.toInt() + " كم/س خلال " + String.format(java.util.Locale.US, "%.2f", dt) + " ث"
+                rejectNote = tr(R.string.str_0327) + Units.spdI(v) + tr(R.string.str_0328) + String.format(java.util.Locale.US, "%.2f", dt) + tr(R.string.str_0329)
             }
         }
     }

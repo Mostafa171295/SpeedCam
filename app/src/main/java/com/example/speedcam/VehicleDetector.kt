@@ -74,13 +74,40 @@ class VehicleDetector(context: Context, private val useGpu: Boolean = true) {
         detector = null
     }
 
-    fun detect(bitmap: Bitmap, minScore: Float): List<Det> {
+    /**
+     * roi: منطقة الكشف (إحداثيات 0..1 من الصورة الكاملة) أو null للصورة كلها. لو موجودة بنقص الصورة،
+     * ونرجّع الصناديق بإحداثيات الصورة الكاملة، ونتجاهل أي صندوق ملامس لحافة القص الصناعية
+     * (عربية مقطوعة بنصها مش هتدّي مكان دقيق، وهتظهر كاملة لما تدخل المنطقة).
+     */
+    fun detect(bitmap: Bitmap, minScore: Float, roi: NBox? = null): List<Det> {
         val d = detector ?: return emptyList()
         val w = bitmap.width.toFloat()
         val h = bitmap.height.toFloat()
         val out = ArrayList<Det>()
+
+        var x0 = 0; var y0 = 0; var cw = bitmap.width; var ch = bitmap.height
+        if (roi != null) {
+            x0 = kotlin.math.floor(roi.l * w).toInt().coerceIn(0, bitmap.width - MIN_CROP_PX)
+            y0 = kotlin.math.floor(roi.t * h).toInt().coerceIn(0, bitmap.height - MIN_CROP_PX)
+            val x1 = kotlin.math.ceil(roi.r * w).toInt().coerceIn(x0 + MIN_CROP_PX, bitmap.width)
+            val y1 = kotlin.math.ceil(roi.b * h).toInt().coerceIn(y0 + MIN_CROP_PX, bitmap.height)
+            cw = x1 - x0; ch = y1 - y0
+        }
+        val cropped = cw < bitmap.width || ch < bitmap.height
+        val src = if (cropped) Bitmap.createBitmap(bitmap, x0, y0, cw, ch) else bitmap
+        try {
+            return detectOn(d, src, minScore, out, x0, y0, cw, ch, w, h, cropped, bitmap)
+        } finally {
+            if (cropped) src.recycle()
+        }
+    }
+
+    private fun detectOn(
+        d: ObjectDetector, src: Bitmap, minScore: Float, out: ArrayList<Det>,
+        x0: Int, y0: Int, cw: Int, ch: Int, w: Float, h: Float, cropped: Boolean, full: Bitmap
+    ): List<Det> {
         val result = try {
-            d.detect(BitmapImageBuilder(bitmap).build())
+            d.detect(BitmapImageBuilder(src).build())
         } catch (e: Throwable) {
             val model = modelName
             if (gpuActive && model != null) {
@@ -97,11 +124,18 @@ class VehicleDetector(context: Context, private val useGpu: Boolean = true) {
             if (c.score() < minScore) continue
             val type = VehicleType.fromLabel(c.categoryName() ?: "") ?: continue
             val b = det.boundingBox()
+            if (cropped) {
+                // حافة القص الصناعية (مش حافة الصورة الأصلية): الصندوق الملامس لها مقطوع
+                val e = EDGE_PX
+                if ((x0 > 0 && b.left < e) || (x0 + cw < full.width && b.right > cw - e) ||
+                    (y0 > 0 && b.top < e) || (y0 + ch < full.height && b.bottom > ch - e)
+                ) continue
+            }
             out += Det(
                 type,
                 NBox(
-                    (b.left / w).coerceIn(0f, 1f), (b.top / h).coerceIn(0f, 1f),
-                    (b.right / w).coerceIn(0f, 1f), (b.bottom / h).coerceIn(0f, 1f)
+                    ((b.left + x0) / w).coerceIn(0f, 1f), ((b.top + y0) / h).coerceIn(0f, 1f),
+                    ((b.right + x0) / w).coerceIn(0f, 1f), ((b.bottom + y0) / h).coerceIn(0f, 1f)
                 ),
                 c.score()
             )
@@ -113,6 +147,8 @@ class VehicleDetector(context: Context, private val useGpu: Boolean = true) {
         const val CUSTOM_MODEL = "vehicles_custom.tflite"
         const val STOCK_MODEL = "efficientdet_lite0.tflite"
         private const val TAG = "VehicleDetector"
+        private const val MIN_CROP_PX = 32     // أصغر قص ممكن بالبكسل
+        private const val EDGE_PX = 2f         // صندوق أقرب من كده لحافة القص يتهمل
     }
 }
 

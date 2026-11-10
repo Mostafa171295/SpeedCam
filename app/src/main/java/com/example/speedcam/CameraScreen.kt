@@ -67,6 +67,10 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
     var showCalib by remember { mutableStateOf(false) }
     var perspMode by remember { mutableStateOf(false) }
     val stab by vm.engine.stability.state.collectAsStateWithLifecycle()
+    val iq by vm.engine.quality.state.collectAsStateWithLifecycle()
+    val accTest by vm.engine.accTest.state.collectAsStateWithLifecycle()
+    val scale by vm.engine.scaleCheck.state.collectAsStateWithLifecycle()
+    val coll by vm.engine.collector.state.collectAsStateWithLifecycle()
     var moveDismissed by remember { mutableStateOf(false) }
     LaunchedEffect(stab.level) { if (stab.level < 2) moveDismissed = false }
     var hasPermission by remember {
@@ -117,10 +121,10 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                 Icon(Icons.Filled.Videocam, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
             }
             Spacer(Modifier.height(16.dp))
-            Text("نحتاج إذن الكاميرا", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("الكاميرا هي مصدر القياس الوحيد. لا يتم حفظ صور إلا لقطات إثبات المتجاوزين (ويمكن إيقافها من الإعدادات).", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr(R.string.str_0040), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(tr(R.string.str_0041), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { BtnText("منح الإذن") }
+            Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { BtnText(tr(R.string.str_0042)) }
         }
         return
     }
@@ -165,6 +169,13 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                                 drawCircle(Amber, 18f, c)
                                 drawIntoCanvas { it.nativeCanvas.drawText(name, c.x, c.y + 9f, abPaint) }
                             }
+                            // منطقة الكشف (لو القص شغّال): إطار سماوي رفيع
+                            if (!perspMode) DetectionZone.compute(s, ov.aspect)?.let { z ->
+                                drawRect(
+                                    Color(0xAA00E5FF), Offset(z.l * w, z.t * h), androidx.compose.ui.geometry.Size(z.w * w, z.h * h),
+                                    style = Stroke(2.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 10f)))
+                                )
+                            }
                             ov.boxes.forEach { b ->
                                 val col = Color(b.type.color)
                                 val bx = b.box.l * w
@@ -198,26 +209,38 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Pill(if (running) "يعمل" else "متوقف", if (running) Color(0xFF2E7D32) else Color(0xFF616161))
+                            Pill(if (running) tr(R.string.str_0043) else tr(R.string.str_0044), if (running) Color(0xFF2E7D32) else Color(0xFF616161))
                             Pill("FPS ${ov.fps}", Color(0xFF263238))
-                            Pill("عدّ ${ov.sessionCount}", Color(0xFF263238))
+                            Pill(tr(R.string.str_0045, ov.sessionCount), Color(0xFF263238))
                             if (stab.hasRef && s.movedGuard) Pill(
-                                "ثبات ${stab.score}%",
+                                tr(R.string.str_0046, stab.score),
                                 when (stab.level) { 0 -> Color(0xFF2E7D32); 1 -> Color(0xFFE65100); else -> Color(0xFFB71C1C) }
                             )
                         }
                         val info = buildList {
-                            add("كشف ${ov.detMs}ms")
+                            add(tr(R.string.str_0047, ov.detMs))
                             add(if (ov.gpu) "GPU" else "CPU")
-                            if (Geo.active(s)) add("منظور")
-                            if (s.sourceMode == 1) add("شبكة: " + streamStatus.ifBlank { "—" })
+                            if (Geo.active(s)) add(tr(R.string.str_0048))
+                            if (s.sourceMode == 1) add(tr(R.string.str_0049) + streamStatus.ifBlank { "—" })
+                            if (iq.ready && iq.sharp >= 0) add(tr(R.string.iq_pill, iq.sharp))
+                            if (accTest.active) add(tr(R.string.at_pill, accTest.passes.size))
+                            if (s.collectOn) add(tr(R.string.tr_pill, coll.count))
                         }.joinToString(" • ")
                         Pill(info, Color(0xFF263238))
                         if (health.message.isNotEmpty()) Pill("⚠ ${health.message}", Color(if (health.level >= 2) 0xFFB71C1C else 0xFFE65100))
+                        iq.message?.let { m -> if (iq.issue != 0) Pill("⚠ " + tr(m), imgQualityColor(iq)) }
+                        if (scale.applicable && scale.level >= 1 && scale.n >= ScaleCheck.MIN_N) Pill(
+                            "⚠ " + tr(
+                                R.string.sc_pill,
+                                String.format(java.util.Locale.US, "%.1f", Units.dist(scale.medianM)),
+                                String.format(java.util.Locale.US, "%.1f", Units.dist(ScaleCheck.EXPECTED_M))
+                            ),
+                            if (scale.level >= 2) Color(0xFFB71C1C) else Color(0xFFE65100)
+                        )
                     }
                     if (ov.modelMissing) {
                         Text(
-                            "ملف الموديل غير موجود\nضع efficientdet_lite0.tflite أو vehicles_custom.tflite في app/src/main/assets",
+                            tr(R.string.str_0050),
                             color = Color.White,
                             modifier = Modifier.align(Alignment.Center).padding(24.dp)
                                 .clip(RoundedCornerShape(12.dp)).background(Color(0xE6B71C1C)).padding(14.dp)
@@ -235,12 +258,12 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                                     onClick = { vm.engine.stability.captureReference() },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFFB71C1C)),
                                     contentPadding = BtnPadding, modifier = Modifier.weight(1f)
-                                ) { BtnText("اعتمد المكان الجديد") }
+                                ) { BtnText(tr(R.string.str_0051)) }
                                 OutlinedButton(
                                     onClick = { moveDismissed = true },
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                                     contentPadding = BtnPadding, modifier = Modifier.weight(1f)
-                                ) { BtnText("تجاهل") }
+                                ) { BtnText(tr(R.string.str_0052)) }
                             }
                         }
                     }
@@ -268,14 +291,14 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                             .padding(start = 12.dp, end = 12.dp, top = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FilterChip(!s.countAll && !s.fastMode, { vm.update { it.copy(countAll = false, fastMode = false) } }, { Text("قياس السرعة") })
-                        FilterChip(s.countAll && !s.fastMode, { vm.update { it.copy(countAll = true, fastMode = false) } }, { Text("عدّ كل العربيات") })
-                        FilterChip(s.fastMode, { vm.update { it.copy(fastMode = true, countAll = false) } }, { Text("وضع سريع") })
+                        FilterChip(!s.countAll && !s.fastMode, { vm.update { it.copy(countAll = false, fastMode = false) } }, { Text(tr(R.string.str_0053)) })
+                        FilterChip(s.countAll && !s.fastMode, { vm.update { it.copy(countAll = true, fastMode = false) } }, { Text(tr(R.string.str_0054)) })
+                        FilterChip(s.fastMode, { vm.update { it.copy(fastMode = true, countAll = false) } }, { Text(tr(R.string.str_0055)) })
                     }
                     if (s.countAll || s.fastMode) {
                         Text(
-                            if (s.fastMode) "بيراقب الحركة عند الخطين بسرعة الكاميرا، والموديل بيحدد النوع لحظة العبور بس. الأفضل اتجاه واحد وموبايل ثابت."
-                            else "بتتعدّ العربية أول ما تعدّي أي خط من الخطين (بدون حساب سرعة).",
+                            if (s.fastMode) tr(R.string.str_0056)
+                            else tr(R.string.str_0057),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp)
@@ -295,7 +318,7 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                         ) {
                             Icon(if (running) Icons.Filled.Stop else Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text(if (running) "إيقاف" else "بدء", maxLines = 1, softWrap = false)
+                            Text(if (running) tr(R.string.str_0058) else tr(R.string.str_0059), maxLines = 1, softWrap = false)
                         }
                         FilledTonalButton(
                             onClick = { showCalib = !showCalib; perspMode = false },
@@ -304,7 +327,7 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                         ) {
                             Icon(Icons.Filled.Tune, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text(if (showCalib) "إخفاء" else "معايرة", maxLines = 1, softWrap = false)
+                            Text(if (showCalib) tr(R.string.str_0060) else tr(R.string.str_0061), maxLines = 1, softWrap = false)
                         }
                         FilledTonalButton(
                             onClick = { perspMode = !perspMode; if (perspMode) showCalib = false },
@@ -313,7 +336,7 @@ fun CameraScreen(vm: MainViewModel, visible: Boolean = true) {
                         ) {
                             Icon(Icons.Filled.GridOn, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text(if (perspMode) "تم" else "منظور", maxLines = 1, softWrap = false)
+                            Text(if (perspMode) tr(R.string.str_0006) else tr(R.string.str_0048), maxLines = 1, softWrap = false)
                         }
                     }
                     if (perspMode && !showCalib) {

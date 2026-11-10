@@ -54,8 +54,8 @@ object Evidence {
         val band = max(40f, h * 0.09f)
         c.drawRect(0f, 0f, w, band, Paint().apply { color = 0xB3000000.toInt() })
         val txt = Paint().apply { color = 0xFFFFFFFF.toInt(); textSize = band * 0.52f; isAntiAlias = true; isFakeBoldText = true }
-        val err = if (ev.errKmh >= 0.5f) " +/- ${ev.errKmh.roundToInt()}" else ""
-        val left = "${ev.speedKmh.roundToInt()}$err km/h  (limit ${s.speedLimit.roundToInt()})"
+        val err = if (ev.errKmh >= 0.5f) " +/- ${Units.spdI(ev.errKmh)}" else ""
+        val left = "${Units.spdI(ev.speedKmh)}$err ${Units.speedLabel()}  (limit ${Units.spdI(s.speedLimit)})"
         val right = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(timeMs))
         val y = band / 2f + txt.textSize * 0.35f
         txt.textAlign = Paint.Align.LEFT
@@ -99,6 +99,6 @@ object Evidence {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        ctx.startActivity(Intent.createChooser(i, "مشاركة لقطة الإثبات").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        ctx.startActivity(Intent.createChooser(i, tr(R.string.str_0084)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }

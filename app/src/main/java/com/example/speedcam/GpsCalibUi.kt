@@ -59,24 +59,24 @@ fun GpsCalibCard(vm: MainViewModel, s: AppSettings) {
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     fun startRec() {
-        msg = if (GpsRef.start(ctx)) "بدأ تسجيل GPS. سيب الشاشة مفتوحة والتطبيق ظاهر." else "فعّل الـ GPS (الموقع) في الموبايل وحاول تاني."
+        msg = if (GpsRef.start(ctx)) tr(R.string.str_0092) else tr(R.string.str_0093)
     }
 
     fun doFix() {
         fixing = true
-        msg = "بحدد موقع الكاميرا... استنى لحد 40 ثانية (في مكان مفتوح)."
+        msg = tr(R.string.str_0094)
         GpsRef.fix(ctx) { loc ->
             fixing = false
-            if (loc == null) msg = "ماقدرتش أحدد الموقع بدقة كفاية. اطلع مكان مفتوح وجرّب تاني."
+            if (loc == null) msg = tr(R.string.str_0095)
             else {
                 vm.update { it.copy(siteLat = loc.latitude.toString(), siteLon = loc.longitude.toString()) }
-                msg = "اتحفظ موقع الكاميرا (دقة ${loc.accuracy.toInt()} متر)."
+                msg = tr(R.string.str_0096, Units.distI(loc.accuracy))
             }
         }
     }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!granted) msg = "محتاج إذن الموقع عشان GPS."
+        if (!granted) msg = tr(R.string.str_0097)
         else if (pending == 1) startRec() else if (pending == 2) doFix()
     }
 
@@ -89,43 +89,43 @@ fun GpsCalibCard(vm: MainViewModel, s: AppSettings) {
         if (uri == null) return@rememberLauncherForActivityResult
         val lat = s.siteLat.toDoubleOrNull()
         val lon = s.siteLon.toDoubleOrNull()
-        if (lat == null || lon == null) { msg = "حدد موقع الكاميرا الأول."; return@rememberLauncherForActivityResult }
+        if (lat == null || lon == null) { msg = tr(R.string.str_0098); return@rememberLauncherForActivityResult }
         try {
             val text = ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
             val pts = GpsCalib.parseCsv(text)
-            if (pts.size < 5) { msg = "الملف مش ملف GPS صالح."; return@rememberLauncherForActivityResult }
+            if (pts.size < 5) { msg = tr(R.string.str_0099); return@rememberLauncherForActivityResult }
             matches = GpsCalib.match(pts, lat, lon, vm.records.value, vm.settings.value)
-            msg = if (matches.isEmpty()) "ماحصلش مرور جنب موقع الكاميرا في الملف ده (النطاق 80 متر)." else "لقيت ${matches.size} مرور."
+            msg = if (matches.isEmpty()) tr(R.string.str_0100) else tr(R.string.str_0101, matches.size)
         } catch (t: Throwable) {
-            msg = "فشل قراءة الملف: ${t.message ?: ""}"
+            msg = tr(R.string.str_0102, t.message ?: "")
         }
     }
 
     AppCard {
-        SectionTitle(Icons.Filled.Speed, "معايرة تلقائية بالـ GPS")
+        SectionTitle(Icons.Filled.Speed, tr(R.string.str_0019))
         Text(
-            "بدل ما تكتب العينات بإيدك: موبايل تاني جوه العربية بيسجل سرعة GPS، والتطبيق بيطابق كل مرور مع قياسه ويضيفه للمعايرة. " +
-                "الموبايلين لازم يكون وقتهم مضبوط تلقائي من الشبكة.",
+            tr(R.string.str_0103) +
+                tr(R.string.str_0104),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Text("١) على موبايل المرجع (اللي جوه العربية)", fontWeight = FontWeight.Bold)
+        Text(tr(R.string.str_0105), fontWeight = FontWeight.Bold)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = !rec, onClick = { ask(1) }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { BtnText("بدء تسجيل GPS") }
+            Button(enabled = !rec, onClick = { ask(1) }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { BtnText(tr(R.string.str_0106)) }
             OutlinedButton(enabled = rec, modifier = Modifier.weight(1f), contentPadding = BtnPadding, onClick = {
                 val name = GpsRef.stop(ctx)
-                msg = if (name != null) "اتحفظ الملف $name في التنزيلات. انقله لموبايل الكاميرا." else "التسجيل كان قصير أو فشل الحفظ."
-            }) { BtnText("إيقاف وحفظ") }
+                msg = if (name != null) tr(R.string.str_0107, name) else tr(R.string.str_0108)
+            }) { BtnText(tr(R.string.str_0109)) }
         }
-        if (rec) Text("بيسجل: $cnt قراءة • السرعة الحالية ${kmh.toInt()} كم/س • دقة الموقع ${acc.toInt()} م", style = MaterialTheme.typography.bodySmall)
+        if (rec) Text(tr(R.string.str_0110, cnt, Units.spdI(kmh), Units.distI(acc)), style = MaterialTheme.typography.bodySmall)
 
-        Text("٢) على موبايل الكاميرا", fontWeight = FontWeight.Bold)
+        Text(tr(R.string.str_0111), fontWeight = FontWeight.Bold)
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(enabled = !fixing, onClick = { ask(2) }, modifier = Modifier.fillMaxWidth()) { BtnText("تحديد موقع الكاميرا") }
-            Button(onClick = { importer.launch("*/*") }, modifier = Modifier.fillMaxWidth()) { BtnText("استيراد ملف GPS ومطابقته") }
+            OutlinedButton(enabled = !fixing, onClick = { ask(2) }, modifier = Modifier.fillMaxWidth()) { BtnText(tr(R.string.str_0112)) }
+            Button(onClick = { importer.launch("*/*") }, modifier = Modifier.fillMaxWidth()) { BtnText(tr(R.string.str_0113)) }
         }
         Text(
-            if (s.siteLat.isNotBlank()) "موقع الكاميرا المحفوظ: ${s.siteLat.take(9)} ، ${s.siteLon.take(9)}" else "موقع الكاميرا لسه ماتحددش.",
+            if (s.siteLat.isNotBlank()) tr(R.string.str_0114, s.siteLat.take(9), s.siteLon.take(9)) else tr(R.string.str_0115),
             style = MaterialTheme.typography.bodySmall
         )
         if (msg.isNotEmpty()) Text(msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -135,15 +135,15 @@ fun GpsCalibCard(vm: MainViewModel, s: AppSettings) {
             if (good.isNotEmpty()) {
                 val diff = good.map { it.rec!!.speedKmh - it.gpsKmh }.average()
                 Text(
-                    "متوسط فرق التطبيق عن الـ GPS حالياً: " + String.format(Locale.US, "%+.1f", diff) + " كم/س (على ${good.size} مرور مقبول)",
+                    tr(R.string.str_0116) + String.format(Locale.US, "%+.1f", Units.spd(diff)) + tr(R.string.str_0117, good.size),
                     fontWeight = FontWeight.Bold
                 )
             }
             matches.forEach { m ->
                 Column(Modifier.fillMaxWidth()) {
                     Text(
-                        fmt.format(m.passT) + "  GPS ${m.gpsKmh.toInt()} كم/س" +
-                            (if (m.rec != null) "  ↔  التطبيق ${m.rec.speedKmh.toInt()} كم/س" else "") +
+                        fmt.format(m.passT) + tr(R.string.str_0118, Units.spdI(m.gpsKmh)) +
+                            (if (m.rec != null) tr(R.string.str_0119, Units.spdI(m.rec.speedKmh)) else "") +
                             (if (m.ok) "  ✓" else "  ⚠"),
                         style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
                         color = if (m.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -158,16 +158,16 @@ fun GpsCalibCard(vm: MainViewModel, s: AppSettings) {
                 val (fa, fb) = Calibration.fit(list)
                 vm.update { it.copy(speedCalib = fa, speedOffset = fb, calSamples = Calibration.encode(list)) }
                 matches = emptyList()
-                msg = "اتضافت ${add.size} عينة للمعايرة. شوف دقة جهازك في كارت معايرة السرعة."
-            }, modifier = Modifier.fillMaxWidth()) { BtnText("إضافة المقبول (${good.size}) كعينات معايرة", maxLines = 2) }
+                msg = tr(R.string.str_0120, add.size)
+            }, modifier = Modifier.fillMaxWidth()) { BtnText(tr(R.string.str_0121, good.size), maxLines = 2) }
             Text(
-                "مهم: السرعة الخام بتتحسب بعكس معايرتك الحالية، فماتغيّرش المعايرة بين القياس والمطابقة. " +
-                    "لو معايرتك الحالية مش صفر خطأ، الأفضل تعمل \"إعادة ضبط\" للمعايرة قبل ما تعمل جولة القياس.",
+                tr(R.string.str_0122) +
+                    tr(R.string.str_0123),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Text(
-            "دقة سرعة GPS عادةً حوالي ±1 كم/س في مكان مفتوح. المرور المقبول لازم تكون سرعته ثابتة وفوق 15 كم/س، ومن غير مركبة تانية قريبة في الوقت.",
+            tr(R.string.str_0124),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

@@ -49,6 +49,7 @@ class Core private constructor(val app: Application) {
 
     init {
         DirectionMode.homo = Geo.active(settings.value)
+        plateReader.setProfile(PlateProfile.resolve(settings.value.plateFormat))
         if (settings.value.readPlates) plateReader.ensureData()
 
         // إعدادات الكاميرا (الدقة، FPS، التعريض) + وضع الاتجاه + تشغيل/إيقاف الخدمة الخلفية
@@ -56,6 +57,14 @@ class Core private constructor(val app: Application) {
             settings.collect { s ->
                 DirectionMode.homo = Geo.active(s)
                 host.onSettings(s)
+                val want = PlateProfile.resolve(s.plateFormat)
+                if (want.id != plateReader.profile.id) {
+                    // تبديل المحرك ممكن يستنى قراءة شغالة، فبنعمله بعيد عن الخيط الرئيسي
+                    scope.launch(Dispatchers.IO) {
+                        plateReader.setProfile(want)
+                        if (settings.value.readPlates) plateReader.ensureData()
+                    }
+                }
             }
         }
         scope.launch(Dispatchers.Main) {
@@ -178,10 +187,10 @@ class Core private constructor(val app: Application) {
         }
         val msg = when {
             level == 0 -> ""
-            critHot -> "حرارة الجهاز عالية جداً (${h.tempC.toInt()}°)"
-            critBat -> "البطارية على وشك الانتهاء (${h.batteryPct}%)"
-            hot -> "حرارة الجهاز مرتفعة (${h.tempC.toInt()}°)"
-            else -> "البطارية ضعيفة (${h.batteryPct}%)"
+            critHot -> tr(R.string.str_0067, h.tempC.toInt())
+            critBat -> tr(R.string.str_0068, h.batteryPct)
+            hot -> tr(R.string.str_0069, h.tempC.toInt())
+            else -> tr(R.string.str_0070, h.batteryPct)
         }
         health.value = h.copy(level = level, message = msg)
 
@@ -193,11 +202,11 @@ class Core private constructor(val app: Application) {
                 if (list.isNotEmpty()) CsvExporter.backupToDownloads(app, list, settings.value.axisHorizontal)
             } catch (_: Throwable) { }
             engine.running = false
-            RecordingNotifications.alert(app, "تم إيقاف القياس", "$msg. اتحفظت نسخة احتياطية. ارجع شغّل القياس لما الجهاز يهدى أو يتشحن.")
+            RecordingNotifications.alert(app, tr(R.string.str_0071), tr(R.string.str_0072, msg))
             lastAlertMs = System.currentTimeMillis()
         } else if (System.currentTimeMillis() - lastAlertMs > ALERT_EVERY_MS) {
             lastAlertMs = System.currentTimeMillis()
-            RecordingNotifications.alert(app, "تنبيه", if (level == 2) "$msg. القياس متوقف." else "$msg. فكّر تبرّد الجهاز أو توصّله بشاحن.")
+            RecordingNotifications.alert(app, tr(R.string.str_0073), if (level == 2) tr(R.string.str_0074, msg) else tr(R.string.str_0075, msg))
         }
     }
 

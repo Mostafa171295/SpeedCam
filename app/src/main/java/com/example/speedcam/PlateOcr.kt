@@ -57,7 +57,8 @@ object PlateParser {
 
     /** الشكل المعروض: الحروف ثم الأرقام بالأرقام العربية. */
     fun display(letters: String, digits: String): String =
-        letters.toList().joinToString(" ") + "  " + toArabicDigits(digits)
+        if (letters.isEmpty()) digits   // صيغة لاتينية: النص كامل مخزّن في digits
+        else letters.toList().joinToString(" ") + "  " + toArabicDigits(digits)
 }
 
 /**
@@ -65,18 +66,21 @@ object PlateParser {
  * ملف اللغة ara.traineddata يتم نسخه من assets لو موجود، وإلا يتم تحميله مرة واحدة من الإنترنت.
  * لازم يُستخدم read() من خيط واحد في نفس الوقت.
  */
-class PlateOcr(private val ctx: Context) {
+class PlateOcr(private val ctx: Context, val lang: String = "ara", private val whitelist: String? = null) {
     private var api: TessBaseAPI? = null
 
     private fun baseDir() = File(ctx.filesDir, "tesseract")
-    private fun dataFile() = File(baseDir(), "tessdata/ara.traineddata")
+    private fun dataFile() = File(baseDir(), "tessdata/$dataName")
+
+    /** اسم ملف اللغة المطلوب (للعرض وللنسخ اليدوي في assets). */
+    val dataName: String get() = "$lang.traineddata"
 
     fun isDataReady(): Boolean = dataFile().let { it.exists() && it.length() > MIN_BYTES }
 
     /** لو حطيت ara.traineddata في app/src/main/assets ننسخه من هناك بدون إنترنت. */
     fun installFromAssets(): Boolean = try {
         File(baseDir(), "tessdata").mkdirs()
-        ctx.assets.open(DATA_NAME).use { i -> dataFile().outputStream().use { o -> i.copyTo(o) } }
+        ctx.assets.open(dataName).use { i -> dataFile().outputStream().use { o -> i.copyTo(o) } }
         isDataReady()
     } catch (e: Exception) {
         false
@@ -84,8 +88,8 @@ class PlateOcr(private val ctx: Context) {
 
     fun download(): Boolean = try {
         val dir = File(baseDir(), "tessdata").apply { mkdirs() }
-        val tmp = File(dir, "$DATA_NAME.part")
-        val conn = (URL(DATA_URL).openConnection() as HttpURLConnection).apply {
+        val tmp = File(dir, "$dataName.part")
+        val conn = (URL(DATA_URL_BASE + dataName).openConnection() as HttpURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 60_000
             instanceFollowRedirects = true
@@ -117,12 +121,13 @@ class PlateOcr(private val ctx: Context) {
 
     private fun initApi(): TessBaseAPI? {
         val a = TessBaseAPI()
-        val ok = try { a.init(baseDir().absolutePath, "ara") } catch (t: Throwable) { Log.e(TAG, "init failed", t); false }
+        val ok = try { a.init(baseDir().absolutePath, lang) } catch (t: Throwable) { Log.e(TAG, "init failed", t); false }
         if (!ok) {
             try { a.recycle() } catch (_: Throwable) { }
             return null
         }
         a.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT)
+        if (whitelist != null) a.setVariable(TessBaseAPI.VAR_CHAR_WHITELIST, whitelist)
         api = a
         return a
     }
@@ -144,8 +149,7 @@ class PlateOcr(private val ctx: Context) {
 
     companion object {
         private const val TAG = "PlateOcr"
-        private const val DATA_NAME = "ara.traineddata"
-        private const val DATA_URL = "https://github.com/tesseract-ocr/tessdata_fast/raw/main/ara.traineddata"
+        private const val DATA_URL_BASE = "https://github.com/tesseract-ocr/tessdata_fast/raw/main/"
         private const val MIN_BYTES = 300_000L
         private const val TARGET_W = 720f
 

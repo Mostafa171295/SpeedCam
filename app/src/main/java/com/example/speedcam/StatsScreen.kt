@@ -93,13 +93,13 @@ fun StatsScreen(vm: MainViewModel) {
     val amber = MaterialTheme.colorScheme.tertiary
 
     Column(Modifier.fillMaxSize()) {
-        AppHeader("الإحصائيات", "تحليل حركة المرور من القياسات المسجلة")
+        AppHeader(tr(R.string.str_0128), tr(R.string.str_0330))
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(range == 0, { range = 0 }, { Text("اليوم") })
-                    FilterChip(range == 1, { range = 1 }, { Text("آخر 7 أيام") })
-                    FilterChip(range == 2, { range = 2 }, { Text("الكل") })
+                    FilterChip(range == 0, { range = 0 }, { Text(tr(R.string.str_0331)) })
+                    FilterChip(range == 1, { range = 1 }, { Text(tr(R.string.str_0332)) })
+                    FilterChip(range == 2, { range = 2 }, { Text(tr(R.string.str_0333)) })
                 }
             }
 
@@ -107,7 +107,7 @@ fun StatsScreen(vm: MainViewModel) {
                 FilterChip(
                     settings.dropOutliers,
                     { vm.update { it.copy(dropOutliers = !settings.dropOutliers) } },
-                    { Text("استبعاد القراءات الشاذة (أبعد من 3 × MAD عن الوسيط)") }
+                    { Text(tr(R.string.str_0334)) }
                 )
             }
 
@@ -119,8 +119,8 @@ fun StatsScreen(vm: MainViewModel) {
                     AppCard {
                         Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Filled.Traffic, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
-                            Text("ابدأ أول قياس", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text("شغّل القياس من تبويب الكاميرا وستظهر الإحصائيات هنا.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr(R.string.str_0335), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(tr(R.string.str_0336), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -128,16 +128,16 @@ fun StatsScreen(vm: MainViewModel) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            MetricTile(Modifier.weight(1f), Icons.Filled.DirectionsCar, "المركبات", "$total", "", Color(0xFF2979FF))
-                            MetricTile(Modifier.weight(1f), Icons.Filled.Speed, "المتوسط", if (speeds.isEmpty()) "—" else "${speeds.average().roundToInt()}", "كم/س", Color(0xFF00A58E))
+                            MetricTile(Modifier.weight(1f), Icons.Filled.DirectionsCar, tr(R.string.str_0126), "$total", "", Color(0xFF2979FF))
+                            MetricTile(Modifier.weight(1f), Icons.Filled.Speed, tr(R.string.str_0337), if (speeds.isEmpty()) "—" else "${Units.spdI(speeds.average())}", tr(R.string.str_0161), Color(0xFF00A58E))
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            MetricTile(Modifier.weight(1f), Icons.Filled.Timeline, "سرعة V85", if (speeds.isEmpty()) "—" else "${percentile(speeds, 0.85).roundToInt()}", "كم/س", Color(0xFFD98200))
-                            MetricTile(Modifier.weight(1f), Icons.Filled.Warning, "الأعلى", if (speeds.isEmpty()) "—" else "${speeds.last().roundToInt()}", "كم/س", Color(0xFFE53935))
+                            MetricTile(Modifier.weight(1f), Icons.Filled.Timeline, tr(R.string.str_0338), if (speeds.isEmpty()) "—" else "${Units.spdI(percentile(speeds, 0.85))}", tr(R.string.str_0161), Color(0xFFD98200))
+                            MetricTile(Modifier.weight(1f), Icons.Filled.Warning, tr(R.string.str_0339), if (speeds.isEmpty()) "—" else "${Units.spdI(speeds.last())}", tr(R.string.str_0161), Color(0xFFE53935))
                         }
                         Text(
-                            "V85: السرعة التي يقل عنها 85% من المركبات، ومعيار شائع في دراسات المرور." +
-                                (if (droppedSpeeds > 0) "  (اتستبعدت $droppedSpeeds قراءة شاذة من حساب السرعات)" else ""),
+                            tr(R.string.str_0340) +
+                                (if (droppedSpeeds > 0) tr(R.string.str_0341, droppedSpeeds) else ""),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -146,7 +146,7 @@ fun StatsScreen(vm: MainViewModel) {
                 item {
                     val parts = VehicleType.entries.map { it to list.count { r -> r.vehicleType == it.name } }.filter { it.second > 0 }
                     AppCard {
-                        SectionTitle(Icons.Filled.DirectionsCar, "حسب نوع المركبة")
+                        SectionTitle(Icons.Filled.DirectionsCar, tr(R.string.str_0342))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Box(Modifier.size(130.dp), contentAlignment = Alignment.Center) {
                                 Canvas(Modifier.fillMaxSize()) {
@@ -164,7 +164,7 @@ fun StatsScreen(vm: MainViewModel) {
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("$total", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                    Text("مركبة", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(tr(R.string.str_0343), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -187,7 +187,7 @@ fun StatsScreen(vm: MainViewModel) {
                                 Box(Modifier.width(4.dp).height(28.dp).clip(RoundedCornerShape(2.dp)).background(Color(t.color)))
                                 Text(t.ar, Modifier.weight(1f), fontWeight = FontWeight.Medium)
                                 Text(
-                                    if (sp.isEmpty()) "عدّ فقط (بدون سرعة)" else "متوسط ${sp.average().roundToInt()}  •  V85 ${percentile(sp, 0.85).roundToInt()}  كم/س",
+                                    if (sp.isEmpty()) tr(R.string.str_0344) else tr(R.string.str_0345, Units.spdI(sp.average()), Units.spdI(percentile(sp, 0.85))),
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -199,7 +199,7 @@ fun StatsScreen(vm: MainViewModel) {
                     val d1 = list.count { it.direction == 1 }
                     val d2 = list.count { it.direction == 2 }
                     AppCard {
-                        SectionTitle(Icons.Filled.SwapHoriz, "حسب الاتجاه")
+                        SectionTitle(Icons.Filled.SwapHoriz, tr(R.string.str_0346))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             listOf(1 to d1, 2 to d2).forEach { (d, n) ->
                                 Column(
@@ -221,14 +221,14 @@ fun StatsScreen(vm: MainViewModel) {
                     val avgPer = total.toFloat() / span
                     val peakB = buckets.maxByOrNull { it.total }
                     AppCard {
-                        SectionTitle(Icons.Filled.Timeline, "حجم المرور")
+                        SectionTitle(Icons.Filled.Timeline, tr(R.string.str_0347))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(!groupDay, { groupDay = false }, { Text("بالساعة") })
-                            FilterChip(groupDay, { groupDay = true }, { Text("باليوم") })
+                            FilterChip(!groupDay, { groupDay = false }, { Text(tr(R.string.str_0348)) })
+                            FilterChip(groupDay, { groupDay = true }, { Text(tr(R.string.str_0349)) })
                         }
                         Text(
-                            "المتوسط: ${String.format(Locale.US, "%.1f", avgPer)} مركبة ${if (groupDay) "في اليوم" else "في الساعة"}" +
-                                (peakB?.let { "   |   الذروة: ${it.total} مركبة (${bucketLabel(it.startMs, groupDay)})" } ?: ""),
+                            tr(R.string.str_0352, String.format(Locale.US, "%.1f", avgPer), if (groupDay) tr(R.string.str_0350) else tr(R.string.str_0351)) +
+                                (peakB?.let { tr(R.string.str_0353, it.total, bucketLabel(it.startMs, groupDay)) } ?: ""),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -237,7 +237,7 @@ fun StatsScreen(vm: MainViewModel) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(bucketLabel(b.startMs, groupDay), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                                     Text("${b.total}", fontWeight = FontWeight.Bold)
-                                    Text(" مركبة", style = MaterialTheme.typography.bodySmall)
+                                    Text(tr(R.string.str_0354), style = MaterialTheme.typography.bodySmall)
                                 }
                                 Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))) {
                                     VehicleType.entries.forEach { t ->
@@ -253,14 +253,14 @@ fun StatsScreen(vm: MainViewModel) {
                             }
                         }
                         if (buckets.size > 48) {
-                            Text("يعرض أحدث 48 فترة، والتقرير المُصدَّر فيه الكل.", style = MaterialTheme.typography.bodySmall)
+                            Text(tr(R.string.str_0355), style = MaterialTheme.typography.bodySmall)
                         }
                         OutlinedButton(onClick = {
                             scope.launch {
                                 val f = withContext(Dispatchers.IO) { CsvExporter.buildVolume(ctx, buckets, groupDay) }
                                 CsvExporter.share(ctx, f)
                             }
-                        }, modifier = Modifier.fillMaxWidth(), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("تصدير تقرير الحجم Excel") }
+                        }, modifier = Modifier.fillMaxWidth(), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText(tr(R.string.str_0356)) }
                     }
                 }
 
@@ -273,7 +273,7 @@ fun StatsScreen(vm: MainViewModel) {
                     val maxH = max(1, hours.max())
                     val peak = hours.indices.maxByOrNull { hours[it] } ?: 0
                     AppCard {
-                        SectionTitle(Icons.Filled.Schedule, "الحركة حسب ساعة اليوم")
+                        SectionTitle(Icons.Filled.Schedule, tr(R.string.str_0357))
                         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                             Canvas(Modifier.fillMaxWidth().height(110.dp)) {
                                 val bw = size.width / 24f
@@ -291,7 +291,7 @@ fun StatsScreen(vm: MainViewModel) {
                             }
                         }
                         if (hours[peak] > 0) {
-                            Text("ذروة الحركة: الساعة $peak:00 (${hours[peak]} مركبة)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr(R.string.str_0358, peak, hours[peak]), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -304,21 +304,21 @@ fun StatsScreen(vm: MainViewModel) {
                             val f = withContext(Dispatchers.IO) { CsvExporter.build(ctx, list, settings.axisHorizontal) }
                             CsvExporter.share(ctx, f)
                         }
-                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("مشاركة Excel") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText(tr(R.string.str_0152)) }
                     OutlinedButton(enabled = list.isNotEmpty(), onClick = {
                         scope.launch {
                             val ok = withContext(Dispatchers.IO) {
                                 CsvExporter.saveToDownloads(ctx, CsvExporter.build(ctx, list, settings.axisHorizontal))
                             }
-                            Toast.makeText(ctx, if (ok) "تم الحفظ في مجلد التنزيلات" else "فشل الحفظ", Toast.LENGTH_LONG).show()
+                            Toast.makeText(ctx, if (ok) tr(R.string.str_0153) else tr(R.string.str_0154), Toast.LENGTH_LONG).show()
                         }
-                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText("حفظ بالتنزيلات") }
-                    IconButton(enabled = all.isNotEmpty(), onClick = { confirmClear = true }) { Icon(Icons.Filled.Delete, "مسح الكل") }
+                    }, modifier = Modifier.weight(1f), contentPadding = BtnPadding) { Icon(Icons.Filled.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); BtnText(tr(R.string.str_0155)) }
+                    IconButton(enabled = all.isNotEmpty(), onClick = { confirmClear = true }) { Icon(Icons.Filled.Delete, tr(R.string.str_0156)) }
                 }
             }
 
             if (total > 0) {
-                item { Text("آخر القراءات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                item { Text(tr(R.string.str_0359), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                 items(list.take(200), key = { it.id }) { r ->
                     val type = VehicleType.fromName(r.vehicleType)
                     Card(
@@ -335,12 +335,12 @@ fun StatsScreen(vm: MainViewModel) {
                                 )
                             }
                             if (r.speedKmh >= 0) {
-                                Text("${r.speedKmh.roundToInt()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                Text("كم/س", style = MaterialTheme.typography.bodySmall)
+                                Text("${Units.spdI(r.speedKmh)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text(tr(R.string.str_0161), style = MaterialTheme.typography.bodySmall)
                             } else {
-                                Text("عدّ فقط", style = MaterialTheme.typography.bodySmall)
+                                Text(tr(R.string.str_0162), style = MaterialTheme.typography.bodySmall)
                             }
-                            IconButton(onClick = { vm.delete(r) }) { Icon(Icons.Filled.Delete, "حذف", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            IconButton(onClick = { vm.delete(r) }) { Icon(Icons.Filled.Delete, tr(R.string.str_0163), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                         }
                     }
                 }
@@ -351,10 +351,10 @@ fun StatsScreen(vm: MainViewModel) {
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("مسح كل البيانات؟") },
-            text = { Text("سيتم حذف كل القراءات نهائياً.") },
-            confirmButton = { TextButton({ vm.clearAll(); confirmClear = false }) { BtnText("مسح") } },
-            dismissButton = { TextButton({ confirmClear = false }) { BtnText("إلغاء") } }
+            title = { Text(tr(R.string.str_0164)) },
+            text = { Text(tr(R.string.str_0360)) },
+            confirmButton = { TextButton({ vm.clearAll(); confirmClear = false }) { BtnText(tr(R.string.str_0166)) } },
+            dismissButton = { TextButton({ confirmClear = false }) { BtnText(tr(R.string.str_0167)) } }
         )
     }
 }

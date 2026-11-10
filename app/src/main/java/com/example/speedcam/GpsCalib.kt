@@ -87,7 +87,7 @@ object GpsCalib {
             val near = sorted.filter { abs(it.t - passT) <= 3000 }
             val inner = near.filter { abs(it.t - passT) <= 2000 }
             if (inner.size < 3) {
-                out += GpsMatch(passT, 0.0, 0.0, minD, null, null, false, "عينات GPS قليلة حوالين المرور")
+                out += GpsMatch(passT, 0.0, 0.0, minD, null, null, false, tr(R.string.str_0085))
                 continue
             }
             val gpsKmh = inner.map { it.kmh }.average()
@@ -96,13 +96,13 @@ object GpsCalib {
                 .sortedBy { abs(it.timestamp - passT) }
             val rec = cands.firstOrNull()
             val problems = ArrayList<String>()
-            if (spread > 4.0) problems += "السرعة مش ثابتة (فرق ${spread.toInt()} كم/س)"
-            if (gpsKmh < 15.0) problems += "السرعة أقل من 15 كم/س"
-            if (rec == null) problems += "مفيش قياس للتطبيق في الوقت ده"
-            if (cands.size > 1) problems += "فيه مركبة تانية قريبة في الوقت"
+            if (spread > 4.0) problems += tr(R.string.str_0086, Units.spdI(spread))
+            if (gpsKmh < 15.0) problems += tr(R.string.str_0087)
+            if (rec == null) problems += tr(R.string.str_0088)
+            if (cands.size > 1) problems += tr(R.string.str_0089)
             if (rec != null) used += rec.id
             val raw = rec?.let { (it.speedKmh - s.speedOffset) / calib }
-            out += GpsMatch(passT, gpsKmh, spread, minD, rec, raw, problems.isEmpty(), if (problems.isEmpty()) "تمام" else problems.joinToString("، "))
+            out += GpsMatch(passT, gpsKmh, spread, minD, rec, raw, problems.isEmpty(), if (problems.isEmpty()) tr(R.string.str_0090) else problems.joinToString(tr(R.string.str_0091)))
         }
         return out
     }
